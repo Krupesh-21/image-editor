@@ -10,10 +10,10 @@ body,
 
 .container {
   background-color: #fafaff;
-  width: 1500px;
   margin: 0 auto;
   padding: 20px;
   margin-top: 20px;
+  width: 80%;
 }
 
 .container .image-upload-container #upload-image {
