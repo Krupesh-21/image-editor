@@ -18,7 +18,7 @@ const ImageEditorProvide = ({ children }) => {
   });
   const [crop, setCrop] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [cropRect, setCropRect] = useState({});
-  // const [zoomScale, setZoomScale] = useState(1);
+  const [disabledCropBtn, setDisabledCropBtn] = useState(true);
 
   const isDragging = useRef(false);
   const imageRef = useRef(null);
@@ -144,6 +144,7 @@ const ImageEditorProvide = ({ children }) => {
 
   const mouseUp = () => {
     isDragging.current = false;
+    setDisabledCropBtn(false);
   };
 
   const cropSelectedArea = () => {
@@ -246,6 +247,7 @@ const ImageEditorProvide = ({ children }) => {
       imageRef.current = img;
       setCrop({ x: 0, y: 0, width: 0, height: 0 });
     }
+    setDisabledCropBtn(true);
   }
 
   const downloadImage = () => {
@@ -408,6 +410,7 @@ const ImageEditorProvide = ({ children }) => {
         settings,
         displayFiles,
         cropSelectedArea,
+        disabledCropBtn,
       }}
     >
       {children}
