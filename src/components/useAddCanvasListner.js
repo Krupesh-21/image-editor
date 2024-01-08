@@ -7,7 +7,6 @@ const useAddCanvasListner = ({ canvas, mouseDown, mouseUp, mouseMove }) => {
       canvas.addEventListener("mousemove", mouseMove, false);
       canvas.addEventListener("mouseup", mouseUp, false);
     }
-    console.log({ canvas });
 
     return () => {
       if (canvas) {

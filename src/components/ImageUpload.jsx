@@ -19,7 +19,6 @@ const ImageUpload = () => {
         id="drag-drop-container"
         onClick={() => {
           const uploadInput = document.getElementById("upload-image");
-          console.log(uploadInput);
           uploadInput?.click();
         }}
         onDragOver={handleDragEnter}

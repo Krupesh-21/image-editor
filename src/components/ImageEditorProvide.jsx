@@ -27,6 +27,9 @@ const ImageEditorProvide = ({ children }) => {
   const rectRef = useRef(cropRect);
 
   let zoomScale = 1;
+  let zoom = 0;
+  let translateX = 0,
+    translateY = 0;
 
   const handleDragEnter = (e) => {
     const dropZone = document.getElementById("drag-drop-container");
@@ -71,7 +74,7 @@ const ImageEditorProvide = ({ children }) => {
     }
 
     const brightness = Math.floor(
-      (colorSum / (img.naturalWidth * img.naturalHeight) / 255) * 100
+      (colorSum / (img.height * img.width) / 255) * 100
     );
 
     return { brightness };
@@ -81,28 +84,16 @@ const ImageEditorProvide = ({ children }) => {
     const canvas = canvasRef.current;
     const ctx = ctxRef.current;
 
-    if (canvasRef && ctx) {
+    if (canvas && ctx) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.scale(settings.flipHorizontal, settings.flipVertical);
       ctx.rotate((settings.rotate * Math.PI) / 180);
       ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
-      ctx.drawImage(
-        imageRef.current,
-        -canvas.width / 2,
-        -canvas.height / 2,
-        canvas.width,
-        canvas.height
-      );
+      ctx.drawImage(imageRef.current, -canvas.width / 2, -canvas.height / 2);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.filter = "none";
-      console.log(
-        -canvas.width / 2,
-        -canvas.height / 2,
-        canvas.width,
-        canvas.height
-      );
 
       if (typeof drawRect === "boolean" && drawRect) {
         const width =
@@ -115,12 +106,16 @@ const ImageEditorProvide = ({ children }) => {
           (rectRef.current?.startY || 0);
         setCropRect((prev) => ({ ...prev, width, height }));
         ctxRef.current.strokeStyle = "white";
+        ctxRef.current.lineWidth = 2;
         ctxRef.current.strokeRect(
           rectRef.current?.startX || 0,
           rectRef.current?.startY || 0,
           width,
           height
         );
+      }
+      if (!drawRect) {
+        window.requestAnimationFrame(applySettings);
       }
       ctx.restore();
     }
@@ -129,7 +124,6 @@ const ImageEditorProvide = ({ children }) => {
   const mouseDown = (e) => {
     isDragging.current = true;
     const rect = canvasRef.current.getBoundingClientRect();
-    console.log(e.clientX - rect.left, e.clientX, rect.left);
     rectRef.current = {
       ...rectRef.current,
       startX: e.clientX - rect.left,
@@ -144,36 +138,15 @@ const ImageEditorProvide = ({ children }) => {
 
   const mouseMove = (e) => {
     if (isDragging.current && rectRef.current?.startX) {
-      // ctxRef.current.save();
-      // ctxRef.current.clearRect(
-      //   0,
-      //   0,
-      //   canvasRef.current.width,
-      //   canvasRef.current.height
-      // );
-      // const canvasWidth = canvasRef.current.width;
-      // const canvasHeight = canvasRef.current.height;
-      // ctxRef.current.translate(canvasWidth / 2, canvasHeight / 2);
-
-      // ctxRef.current.scale(settings.flipHorizontal, settings.flipVertical);
-      // ctxRef.current.rotate((settings.rotate * Math.PI) / 180);
-      // ctxRef.current.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
-
-      // ctxRef.current.drawImage(
-      //   imageRef.current,
-      //   -canvasWidth / 2,
-      //   -canvasHeight / 2,
-      //   canvasWidth,
-      //   canvasHeight
-      // );
-
       applySettings(true, e);
-      // ctxRef.current.restore();
     }
   };
 
   const mouseUp = () => {
     isDragging.current = false;
+  };
+
+  const cropSelectedArea = () => {
     createCropPreview(imageRef.current, true);
   };
 
@@ -184,12 +157,12 @@ const ImageEditorProvide = ({ children }) => {
     reader.onload = (e) => {
       if (file) {
         const imagePreview = document.getElementById("image-preview");
-        const previewImage = document.getElementById("preview-image");
+        const oldCanvas = document.getElementById("canvas");
         const previewContainer = document.querySelector(
           ".image-preview-container"
         );
-        if (previewImage) {
-          previewImage.remove();
+        if (oldCanvas) {
+          oldCanvas.remove();
         }
 
         const canvas = document.createElement("canvas");
@@ -208,16 +181,6 @@ const ImageEditorProvide = ({ children }) => {
           // imagePreview.appendChild(img);
           imagePreview.appendChild(canvas);
         }
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(
-          img,
-          -canvas.width / 2,
-          -canvas.height / 2,
-          canvas.width,
-          canvas.height
-        );
-        window.requestAnimationFrame(applySettings);
         setSettings((prev) => ({
           ...prev,
           ...getImageBrightness(img),
@@ -261,7 +224,6 @@ const ImageEditorProvide = ({ children }) => {
     canvas.height = Math.ceil(height);
 
     const ctx = ctxRef.current;
-    console.log((isFromDrag ? cropRect.startX : crop.x) * scaleX, scaleX);
 
     ctx.drawImage(
       img,
@@ -290,19 +252,30 @@ const ImageEditorProvide = ({ children }) => {
     const canvas = canvasRef.current;
     const ctx = ctxRef.current;
 
-    ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
-    if (settings.rotate) {
-      ctx.rotate((Number(settings.rotate) * Math.PI) / 180);
-    }
     ctx.scale(settings.flipHorizontal, settings.flipVertical);
-    ctx.drawImage(
-      imageRef.current,
-      -canvas.width / 2,
-      -canvas.height / 2,
-      canvas.width,
-      canvas.height
+    ctx.rotate((settings.rotate * Math.PI) / 180);
+    ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
+    ctx.drawImage(imageRef.current, -canvas.width / 2, -canvas.height / 2);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.filter = "none";
+
+    const trasnform = ctx.getTransform();
+    ctx.resetTransform();
+    ctx.translate(translateX, translateY);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-translateX, -translateY);
+    ctx.transform(
+      trasnform.a,
+      trasnform.b,
+      trasnform.c,
+      trasnform.d,
+      trasnform.e,
+      trasnform.f
     );
+    ctx.restore();
 
     const link = document.createElement("a");
     link.download = imageName;
@@ -350,13 +323,13 @@ const ImageEditorProvide = ({ children }) => {
   };
 
   const handleZoomInAndOut = (e) => {
-    const zoomStep = 0.2;
+    const zoomStep = 0.02;
     const canvas = canvasRef.current;
 
     e.preventDefault();
 
-    let x = e.clientX - canvas.offsetLeft;
-    let y = e.clientY - canvas.offsetTop;
+    translateX = e.clientX - canvas.offsetLeft;
+    translateY = e.clientY - canvas.offsetTop;
     const wheel = e.deltaY < 0 ? 1 : -1;
 
     let zoom = Math.exp(wheel * zoomStep);
@@ -365,15 +338,16 @@ const ImageEditorProvide = ({ children }) => {
     if (zoomScale <= 1) {
       ctxRef.current.resetTransform();
       zoomScale = 1;
+      applySettings();
       return;
     }
 
     ctxRef.current.clearRect(0, 0, canvas.width, canvas.height);
-    let trasnform = ctxRef.current.getTransform();
+    const trasnform = ctxRef.current.getTransform();
     ctxRef.current.resetTransform();
-    ctxRef.current.translate(x, y);
+    ctxRef.current.translate(translateX, translateY);
     ctxRef.current.scale(zoom, zoom);
-    ctxRef.current.translate(-x, -y);
+    ctxRef.current.translate(-translateX, -translateY);
     ctxRef.current.transform(
       trasnform.a,
       trasnform.b,
@@ -433,6 +407,7 @@ const ImageEditorProvide = ({ children }) => {
         crop,
         settings,
         displayFiles,
+        cropSelectedArea,
       }}
     >
       {children}
