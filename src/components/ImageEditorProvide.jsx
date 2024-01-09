@@ -363,7 +363,6 @@ const ImageEditorProvide = ({ children }) => {
         ...getImageBrightness(),
       }));
     }
-    console.log({ image });
   }, [image]);
 
   useEffect(() => {
