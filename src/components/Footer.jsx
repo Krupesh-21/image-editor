@@ -7,7 +7,7 @@ const Footer = () => {
   return image ? (
     <div className="footer">
       <button disabled={disabledCropBtn} onClick={cropSelectedArea}>
-        Crop Selected Area
+        Apply Crop
       </button>
       <button onClick={downloadImage}>Download Image</button>
       <button onClick={reset}>Reset</button>

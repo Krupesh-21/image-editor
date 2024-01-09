@@ -3,8 +3,6 @@ import { createContext, useCallback, useEffect, useRef, useState } from "react";
 
 export const ImageEditorContext = createContext(null);
 
-let animationId = null;
-
 const ImageEditorProvide = ({ children }) => {
   const [image, setImage] = useState(null);
   const [oldImage, setOldImage] = useState(null);
@@ -54,18 +52,14 @@ const ImageEditorProvide = ({ children }) => {
     // let alphaSum = 0;
     let colorSum = 0;
 
-    const canvas = canvasRef.current;
-    const { width, height } =
-      canvas?.parentElement?.getBoundingClientRect() || {};
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
 
     const ctx = canvas.getContext("2d");
-    if (width || height) {
-      ctx.canvas.width = width;
-      ctx.canvas.height = height;
-    }
-    ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2);
+    ctx.drawImage(img, 0, 0);
 
-    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     let r, g, b, avg;
 
     for (let x = 0, len = data.length; x < len; x += 4) {
@@ -74,13 +68,14 @@ const ImageEditorProvide = ({ children }) => {
       b = data[x + 2];
       // a = data[x + 3];
 
-      // avg = 0.2126 * r + 0.7152 * g + 0.072 * b;
       avg = Math.floor((r + g + b) / 3);
       colorSum += avg;
       // alphaSum += a;
     }
 
-    const brightness = Math.floor(colorSum / (canvas.height * canvas.width));
+    const brightness = Math.floor(
+      (colorSum / (img.height * img.width) / 255) * 100
+    );
 
     return { brightness };
   };
@@ -89,57 +84,38 @@ const ImageEditorProvide = ({ children }) => {
     const canvas = canvasRef.current;
     const ctx = ctxRef.current;
 
-    const { width, height } =
-      canvas?.parentElement?.getBoundingClientRect() || {};
-    if (width || height) {
-      ctx.canvas.width = width;
-      ctx.canvas.height = height;
-    }
-
     if (canvas && ctx) {
-      const { brightness } = getImageBrightness();
-      if (!settings.brightness) {
-        setSettings((prev) => ({
-          ...prev,
-          brightness,
-        }));
-      }
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.scale(settings.flipHorizontal, settings.flipVertical);
       ctx.rotate((settings.rotate * Math.PI) / 180);
-      ctx.filter = `brightness(${
-        settings.brightness || brightness
-      }%) saturate(${settings.saturation}%) invert(${
-        settings.inversion
-      }%) grayscale(${settings.grayscale}%)`;
+      ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
       ctx.drawImage(imageRef.current, -canvas.width / 2, -canvas.height / 2);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.filter = "none";
 
       if (typeof drawRect === "boolean" && drawRect) {
         const width =
-          e.pageX - canvas.offsetLeft - (rectRef.current?.startX || 0);
+          e.pageX -
+          canvasRef.current.offsetLeft -
+          (rectRef.current?.startX || 0);
         const height =
-          e.pageY - canvas.offsetTop - (rectRef.current?.startY || 0);
+          e.pageY -
+          canvasRef.current.offsetTop -
+          (rectRef.current?.startY || 0);
         setCropRect((prev) => ({ ...prev, width, height }));
-        ctx.strokeStyle = "white";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(
+        ctxRef.current.strokeStyle = "white";
+        ctxRef.current.lineWidth = 2;
+        ctxRef.current.strokeRect(
           rectRef.current?.startX || 0,
           rectRef.current?.startY || 0,
           width,
           height
         );
       }
-      if (animationId) {
-        window.cancelAnimationFrame(animationId);
-      }
-      if (!isDragging.current) {
-        animationId = window.requestAnimationFrame(() =>
-          applySettings(drawRect, e)
-        );
+      if (!drawRect) {
+        window.requestAnimationFrame(applySettings);
       }
       ctx.restore();
     }
@@ -158,7 +134,6 @@ const ImageEditorProvide = ({ children }) => {
       startX: e.clientX - rect.left,
       startY: e.clientY - rect.top,
     }));
-    window.cancelAnimationFrame(animationId);
   };
 
   const mouseMove = (e) => {
@@ -197,6 +172,8 @@ const ImageEditorProvide = ({ children }) => {
         const img = document.createElement("img");
         img.src = e.target.result;
         img.id = "preview-image";
+        canvas.width = 1000;
+        canvas.height = 500;
         canvasRef.current = canvas;
         ctxRef.current = ctx;
         imageRef.current = img;
@@ -205,6 +182,10 @@ const ImageEditorProvide = ({ children }) => {
           // imagePreview.appendChild(img);
           imagePreview.appendChild(canvas);
         }
+        setSettings((prev) => ({
+          ...prev,
+          ...getImageBrightness(img),
+        }));
         setOldImage(e.target.result);
         setImageName(file.name);
         setImage(e.target.result);
@@ -258,6 +239,7 @@ const ImageEditorProvide = ({ children }) => {
     );
 
     const dataUrl = canvas.toDataURL();
+    // const previewImage = document.getElementById("preview-image");
     if (dataUrl !== "data:,") {
       setImage(dataUrl);
       const img = document.createElement("img");
@@ -320,10 +302,16 @@ const ImageEditorProvide = ({ children }) => {
       setCrop({ x: 0, y: 0, width: 0, height: 0 });
       img.src = oldImage;
       setImage(oldImage);
-      const { brightness } = getImageBrightness();
+      const { brightness } = getImageBrightness(img);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.save();
-      ctx.drawImage(imageRef.current, -canvas.width / 2, -canvas.height / 2);
+      ctx.drawImage(
+        imageRef.current,
+        -canvas.width / 2,
+        -canvas.height / 2,
+        canvas.width,
+        canvas.height
+      );
       setSettings({
         grayscale: 0,
         brightness,
@@ -337,7 +325,7 @@ const ImageEditorProvide = ({ children }) => {
   };
 
   const handleZoomInAndOut = (e) => {
-    const zoomStep = 0.05;
+    const zoomStep = 0.02;
     const canvas = canvasRef.current;
 
     e.preventDefault();
@@ -379,7 +367,10 @@ const ImageEditorProvide = ({ children }) => {
 
   useEffect(() => {
     if (image) {
-      applySettings();
+      setSettings((prev) => ({
+        ...prev,
+        brightness: getImageBrightness().brightness,
+      }));
     }
   }, [image]);
 
@@ -399,16 +390,6 @@ const ImageEditorProvide = ({ children }) => {
       }
     };
   }, [canvasRef.current, mouseDown, mouseMove, mouseUp]);
-
-  useEffect(() => {
-    window.addEventListener("resize", (e) => {
-      const ctx = ctxRef.current;
-      // const imagePreview = document.getElementById('image-preview')
-      if (ctx) {
-        applySettings(false, e);
-      }
-    });
-  }, []);
 
   return (
     <ImageEditorContext.Provider
