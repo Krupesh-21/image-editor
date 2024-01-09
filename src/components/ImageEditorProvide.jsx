@@ -3,6 +3,8 @@ import { createContext, useCallback, useEffect, useRef, useState } from "react";
 
 export const ImageEditorContext = createContext(null);
 
+let animationId = null;
+
 const ImageEditorProvide = ({ children }) => {
   const [image, setImage] = useState(null);
   const [oldImage, setOldImage] = useState(null);
@@ -52,12 +54,10 @@ const ImageEditorProvide = ({ children }) => {
     // let alphaSum = 0;
     let colorSum = 0;
 
-    const canvas = document.createElement("canvas");
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
+    const canvas = canvasRef.current;
 
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0);
+    ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2);
 
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     let r, g, b, avg;
@@ -73,9 +73,7 @@ const ImageEditorProvide = ({ children }) => {
       // alphaSum += a;
     }
 
-    const brightness = Math.floor(
-      (colorSum / (img.height * img.width) / 255) * 100
-    );
+    const brightness = Math.floor(colorSum / (canvas.height * canvas.width));
 
     return { brightness };
   };
@@ -114,8 +112,13 @@ const ImageEditorProvide = ({ children }) => {
           height
         );
       }
-      if (!drawRect) {
-        window.requestAnimationFrame(applySettings);
+
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+
+      if (!isDragging.current) {
+        animationId = window.requestAnimationFrame(applySettings);
       }
       ctx.restore();
     }
