@@ -26,7 +26,6 @@ const ImageEditorProvide = ({ children }) => {
   const imageRef = useRef(null);
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
-  const rectRef = useRef(cropRect);
 
   let zoomScale = 1;
   let zoom = 0;
@@ -57,7 +56,7 @@ const ImageEditorProvide = ({ children }) => {
     const canvas = canvasRef.current;
 
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2);
+    ctx.drawImage(img, 0, 0);
 
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     let r, g, b, avg;
@@ -95,19 +94,15 @@ const ImageEditorProvide = ({ children }) => {
 
       if (typeof drawRect === "boolean" && drawRect) {
         const width =
-          e.pageX -
-          canvasRef.current.offsetLeft -
-          (rectRef.current?.startX || 0);
+          e.pageX - canvasRef.current.offsetLeft - (cropRect?.startX || 0);
         const height =
-          e.pageY -
-          canvasRef.current.offsetTop -
-          (rectRef.current?.startY || 0);
+          e.pageY - canvasRef.current.offsetTop - (cropRect?.startY || 0);
         setCropRect((prev) => ({ ...prev, width, height }));
         ctxRef.current.strokeStyle = "white";
         ctxRef.current.lineWidth = 2;
         ctxRef.current.strokeRect(
-          rectRef.current?.startX || 0,
-          rectRef.current?.startY || 0,
+          cropRect?.startX || 0,
+          cropRect?.startY || 0,
           width,
           height
         );
@@ -127,11 +122,6 @@ const ImageEditorProvide = ({ children }) => {
   const mouseDown = (e) => {
     isDragging.current = true;
     const rect = canvasRef.current.getBoundingClientRect();
-    rectRef.current = {
-      ...rectRef.current,
-      startX: e.clientX - rect.left,
-      startY: e.clientY - rect.top,
-    };
     setCropRect((prev) => ({
       ...prev,
       startX: e.clientX - rect.left,
@@ -140,7 +130,7 @@ const ImageEditorProvide = ({ children }) => {
   };
 
   const mouseMove = (e) => {
-    if (isDragging.current && rectRef.current?.startX) {
+    if (isDragging.current) {
       applySettings(true, e);
     }
   };
@@ -185,10 +175,6 @@ const ImageEditorProvide = ({ children }) => {
           // imagePreview.appendChild(img);
           imagePreview.appendChild(canvas);
         }
-        setSettings((prev) => ({
-          ...prev,
-          ...getImageBrightness(img),
-        }));
         setOldImage(e.target.result);
         setImageName(file.name);
         setImage(e.target.result);
@@ -251,6 +237,8 @@ const ImageEditorProvide = ({ children }) => {
       setCrop({ x: 0, y: 0, width: 0, height: 0 });
     }
     setDisabledCropBtn(true);
+    if (animationId) cancelAnimationFrame(animationId);
+    animationId = requestAnimationFrame(applySettings);
   }
 
   const downloadImage = () => {
@@ -305,7 +293,7 @@ const ImageEditorProvide = ({ children }) => {
       setCrop({ x: 0, y: 0, width: 0, height: 0 });
       img.src = oldImage;
       setImage(oldImage);
-      const { brightness } = getImageBrightness(img);
+      const { brightness } = getImageBrightness();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.save();
       ctx.drawImage(
@@ -337,7 +325,7 @@ const ImageEditorProvide = ({ children }) => {
     translateY = e.clientY - canvas.offsetTop;
     const wheel = e.deltaY < 0 ? 1 : -1;
 
-    let zoom = Math.exp(wheel * zoomStep);
+    zoom = Math.exp(wheel * zoomStep);
     zoomScale = Math.min(zoomScale * zoom, 30);
 
     if (zoomScale <= 1) {
@@ -372,9 +360,10 @@ const ImageEditorProvide = ({ children }) => {
     if (image) {
       setSettings((prev) => ({
         ...prev,
-        brightness: getImageBrightness().brightness,
+        ...getImageBrightness(),
       }));
     }
+    console.log({ image });
   }, [image]);
 
   useEffect(() => {
@@ -403,7 +392,6 @@ const ImageEditorProvide = ({ children }) => {
         setSettings,
         applyCrop,
         createCropPreview,
-        getImageBrightness,
         handleCropChange,
         handleSettings,
         handleDragEnter,
