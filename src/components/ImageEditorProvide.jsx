@@ -364,6 +364,7 @@ const ImageEditorProvide = ({ children }) => {
 
   useEffect(() => {
     if (canvasRef.current) applySettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
 
   useEffect(() => {
