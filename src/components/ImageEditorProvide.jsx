@@ -24,12 +24,11 @@ const ImageEditorProvide = ({ children }) => {
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [zoomScale, setZoomScale] = useState(1);
 
   const imageRef = useRef(null);
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
-
-  const zoomScale = useRef(1);
 
   const handleDragEnter = (e) => {
     const dropZone = document.getElementById("drag-drop-container");
@@ -332,11 +331,13 @@ const ImageEditorProvide = ({ children }) => {
       const wheel = e.deltaY < 0 ? 1 : -1;
 
       const zoom = Math.exp(wheel * zoomStep);
-      zoomScale.current = Math.min(zoomScale.current * zoom, 30);
+      let _zoomScale = 1;
+      _zoomScale = Math.min(zoomScale * zoom, 30);
 
-      if (zoomScale.current <= 1) {
+      if (_zoomScale <= 1) {
         ctxRef.current.resetTransform();
-        zoomScale.current = 1;
+        _zoomScale = 1;
+        setZoomScale(_zoomScale);
         applySettings();
         return;
       }
@@ -357,9 +358,10 @@ const ImageEditorProvide = ({ children }) => {
       );
       setTranslate((prev) => ({ ...prev, x: translateX, y: translateY }));
       setZoom(zoom);
+      setZoomScale(_zoomScale);
       applySettings();
     },
-    [applySettings]
+    [applySettings, zoomScale]
   );
 
   useEffect(() => {
