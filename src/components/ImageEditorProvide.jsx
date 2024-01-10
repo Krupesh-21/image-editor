@@ -21,16 +21,16 @@ const ImageEditorProvide = ({ children }) => {
   const [crop, setCrop] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [cropRect, setCropRect] = useState({});
   const [disabledCropBtn, setDisabledCropBtn] = useState(true);
+  const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(0);
 
   const isDragging = useRef(false);
   const imageRef = useRef(null);
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
 
-  let zoomScale = 1;
-  let zoom = 0;
-  let translateX = 0,
-    translateY = 0;
+  const zoomScale = useRef(1);
+  // let zoom = 0;
 
   const handleDragEnter = (e) => {
     const dropZone = document.getElementById("drag-drop-container");
@@ -77,49 +77,52 @@ const ImageEditorProvide = ({ children }) => {
     return { brightness };
   };
 
-  const applySettings = (drawRect = false, e) => {
-    const canvas = canvasRef.current;
-    const ctx = ctxRef.current;
+  const applySettings = useCallback(
+    (drawRect = false, e) => {
+      const canvas = canvasRef.current;
+      const ctx = ctxRef.current;
 
-    if (canvas && ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.scale(settings.flipHorizontal, settings.flipVertical);
-      ctx.rotate((settings.rotate * Math.PI) / 180);
-      ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
-      ctx.drawImage(imageRef.current, -canvas.width / 2, -canvas.height / 2);
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.filter = "none";
+      if (canvas && ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(settings.flipHorizontal, settings.flipVertical);
+        ctx.rotate((settings.rotate * Math.PI) / 180);
+        ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
+        ctx.drawImage(imageRef.current, -canvas.width / 2, -canvas.height / 2);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.filter = "none";
 
-      if (typeof drawRect === "boolean" && drawRect) {
-        const width =
-          e.pageX - canvasRef.current.offsetLeft - (cropRect?.startX || 0);
-        const height =
-          e.pageY - canvasRef.current.offsetTop - (cropRect?.startY || 0);
-        setCropRect((prev) => ({ ...prev, width, height }));
-        ctxRef.current.strokeStyle = "white";
-        ctxRef.current.lineWidth = 2;
-        ctxRef.current.strokeRect(
-          cropRect?.startX || 0,
-          cropRect?.startY || 0,
-          width,
-          height
-        );
+        if (typeof drawRect === "boolean" && drawRect) {
+          const width =
+            e.pageX - canvasRef.current.offsetLeft - (cropRect?.startX || 0);
+          const height =
+            e.pageY - canvasRef.current.offsetTop - (cropRect?.startY || 0);
+          setCropRect((prev) => ({ ...prev, width, height }));
+          ctxRef.current.strokeStyle = "white";
+          ctxRef.current.lineWidth = 2;
+          ctxRef.current.strokeRect(
+            cropRect?.startX || 0,
+            cropRect?.startY || 0,
+            width,
+            height
+          );
+        }
+
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+        }
+
+        if (!isDragging.current) {
+          animationId = window.requestAnimationFrame(applySettings);
+        }
+        ctx.restore();
       }
+    },
+    [cropRect, settings]
+  );
 
-      if (animationId) {
-        cancelAnimationFrame(animationId);
-      }
-
-      if (!isDragging.current) {
-        animationId = window.requestAnimationFrame(applySettings);
-      }
-      ctx.restore();
-    }
-  };
-
-  const mouseDown = (e) => {
+  const mouseDown = useCallback((e) => {
     isDragging.current = true;
     const rect = canvasRef.current.getBoundingClientRect();
     setCropRect((prev) => ({
@@ -127,18 +130,21 @@ const ImageEditorProvide = ({ children }) => {
       startX: e.clientX - rect.left,
       startY: e.clientY - rect.top,
     }));
-  };
+  }, []);
 
-  const mouseMove = (e) => {
-    if (isDragging.current) {
-      applySettings(true, e);
-    }
-  };
+  const mouseMove = useCallback(
+    (e) => {
+      if (isDragging.current) {
+        applySettings(true, e);
+      }
+    },
+    [applySettings]
+  );
 
-  const mouseUp = () => {
+  const mouseUp = useCallback(() => {
     isDragging.current = false;
     setDisabledCropBtn(false);
-  };
+  }, []);
 
   const cropSelectedArea = () => {
     createCropPreview(imageRef.current, true);
@@ -257,9 +263,9 @@ const ImageEditorProvide = ({ children }) => {
 
     const trasnform = ctx.getTransform();
     ctx.resetTransform();
-    ctx.translate(translateX, translateY);
+    ctx.translate(translate.x, translate.y);
     ctx.scale(zoom, zoom);
-    ctx.translate(-translateX, -translateY);
+    ctx.translate(-translate.x, -translate.y);
     ctx.transform(
       trasnform.a,
       trasnform.b,
@@ -315,42 +321,47 @@ const ImageEditorProvide = ({ children }) => {
     }
   };
 
-  const handleZoomInAndOut = (e) => {
-    const zoomStep = 0.02;
-    const canvas = canvasRef.current;
+  const handleZoomInAndOut = useCallback(
+    (e) => {
+      const zoomStep = 0.02;
+      const canvas = canvasRef.current;
 
-    e.preventDefault();
+      e.preventDefault();
 
-    translateX = e.clientX - canvas.offsetLeft;
-    translateY = e.clientY - canvas.offsetTop;
-    const wheel = e.deltaY < 0 ? 1 : -1;
+      const translateX = e.clientX - canvas.offsetLeft;
+      const translateY = e.clientY - canvas.offsetTop;
+      const wheel = e.deltaY < 0 ? 1 : -1;
 
-    zoom = Math.exp(wheel * zoomStep);
-    zoomScale = Math.min(zoomScale * zoom, 30);
+      const zoom = Math.exp(wheel * zoomStep);
+      zoomScale.current = Math.min(zoomScale * zoom, 30);
 
-    if (zoomScale <= 1) {
+      if (zoomScale.current <= 1) {
+        ctxRef.current.resetTransform();
+        zoomScale.current = 1;
+        applySettings();
+        return;
+      }
+
+      ctxRef.current.clearRect(0, 0, canvas.width, canvas.height);
+      const trasnform = ctxRef.current.getTransform();
       ctxRef.current.resetTransform();
-      zoomScale = 1;
+      ctxRef.current.translate(translateX, translateY);
+      ctxRef.current.scale(zoom, zoom);
+      ctxRef.current.translate(-translateX, -translateY);
+      ctxRef.current.transform(
+        trasnform.a,
+        trasnform.b,
+        trasnform.c,
+        trasnform.d,
+        trasnform.e,
+        trasnform.f
+      );
+      setTranslate((prev) => ({ ...prev, x: translateX, y: translateY }));
+      setZoom(zoom);
       applySettings();
-      return;
-    }
-
-    ctxRef.current.clearRect(0, 0, canvas.width, canvas.height);
-    const trasnform = ctxRef.current.getTransform();
-    ctxRef.current.resetTransform();
-    ctxRef.current.translate(translateX, translateY);
-    ctxRef.current.scale(zoom, zoom);
-    ctxRef.current.translate(-translateX, -translateY);
-    ctxRef.current.transform(
-      trasnform.a,
-      trasnform.b,
-      trasnform.c,
-      trasnform.d,
-      trasnform.e,
-      trasnform.f
-    );
-    applySettings();
-  };
+    },
+    [applySettings]
+  );
 
   useEffect(() => {
     if (canvasRef.current) applySettings();
@@ -366,26 +377,23 @@ const ImageEditorProvide = ({ children }) => {
   }, [image]);
 
   useEffect(() => {
-    if (canvasRef.current) {
-      canvasRef.current.addEventListener("mousedown", mouseDown, false);
-      canvasRef.current.addEventListener("mousemove", mouseMove, false);
-      canvasRef.current.addEventListener("mouseup", mouseUp, false);
-      canvasRef.current.addEventListener("wheel", handleZoomInAndOut, true);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.addEventListener("mousedown", mouseDown, false);
+      canvas.addEventListener("mousemove", mouseMove, false);
+      canvas.addEventListener("mouseup", mouseUp, false);
+      canvas.addEventListener("wheel", handleZoomInAndOut, true);
     }
 
     return () => {
-      if (canvasRef.current) {
-        canvasRef.current.removeEventListener("mousedown", mouseDown, false);
-        canvasRef.current.removeEventListener("mousemove", mouseMove, false);
-        canvasRef.current.removeEventListener("mouseup", mouseUp, false);
-        canvasRef.current.removeEventListener(
-          "wheel",
-          handleZoomInAndOut,
-          true
-        );
+      if (canvas) {
+        canvas.removeEventListener("mousedown", mouseDown, false);
+        canvas.removeEventListener("mousemove", mouseMove, false);
+        canvas.removeEventListener("mouseup", mouseUp, false);
+        canvas.removeEventListener("wheel", handleZoomInAndOut, true);
       }
     };
-  }, [canvasRef.current, mouseDown, mouseMove, mouseUp]);
+  }, [mouseDown, mouseMove, mouseUp, handleZoomInAndOut]);
 
   return (
     <ImageEditorContext.Provider
