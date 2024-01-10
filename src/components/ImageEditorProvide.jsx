@@ -51,25 +51,38 @@ const ImageEditorProvide = ({ children }) => {
   const drawImage = useCallback(() => {
     const img = imageRef.current;
 
-    const cansvasWidth = canvas.width;
+    const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
     const imgWidth = img.width;
     const imgHeight = img.height;
 
     const scaleFactor = Math.min(
-      cansvasWidth / imgWidth,
+      canvasWidth / imgWidth,
       canvasHeight / imgHeight
     );
     const newWidth = imgWidth * scaleFactor;
     const newHeight = imgHeight * scaleFactor;
 
-    const x = (cansvasWidth - newWidth) / 2;
+    const x = (canvasWidth - newWidth) / 2;
     const y = (canvasHeight - newHeight) / 2;
 
-    ctx.clearRect(0, 0, cansvasWidth, canvasHeight);
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     ctx.save();
     ctx.drawImage(img, x, y, newWidth, newHeight);
   }, [canvas, ctx]);
+
+  const drawCropBox = (e) => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    const width = e.pageX - canvas.offsetLeft - (cropRect?.startX || 0);
+    const height = e.pageY - canvas.offsetTop - (cropRect?.startY || 0);
+    setCropRect((prev) => ({ ...prev, width, height }));
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cropRect?.startX || 0, cropRect?.startY || 0, width, height);
+
+    ctx.restore();
+  };
 
   const applySettings = useCallback(
     (drawRect = false, e) => {
@@ -80,20 +93,6 @@ const ImageEditorProvide = ({ children }) => {
         drawImage();
         ctx.filter = "none";
 
-        if (typeof drawRect === "boolean" && drawRect) {
-          const width = e.pageX - canvas.offsetLeft - (cropRect?.startX || 0);
-          const height = e.pageY - canvas.offsetTop - (cropRect?.startY || 0);
-          setCropRect((prev) => ({ ...prev, width, height }));
-          ctx.strokeStyle = "white";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(
-            cropRect?.startX || 0,
-            cropRect?.startY || 0,
-            width,
-            height
-          );
-        }
-
         if (animationId) {
           cancelAnimationFrame(animationId);
         }
@@ -102,9 +101,12 @@ const ImageEditorProvide = ({ children }) => {
           animationId = window.requestAnimationFrame(applySettings);
         }
         ctx.restore();
+        if (typeof drawRect === "boolean" && drawRect) {
+          drawCropBox(e);
+        }
       }
     },
-    [cropRect, settings, isDragging, canvas, ctx, drawImage]
+    [cropRect, settings, isDragging, canvas, ctx, drawImage, drawCropBox]
   );
 
   const mouseDown = useCallback(
