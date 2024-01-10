@@ -23,14 +23,13 @@ const ImageEditorProvide = ({ children }) => {
   const [disabledCropBtn, setDisabledCropBtn] = useState(true);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const isDragging = useRef(false);
   const imageRef = useRef(null);
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
 
   const zoomScale = useRef(1);
-  // let zoom = 0;
 
   const handleDragEnter = (e) => {
     const dropZone = document.getElementById("drag-drop-container");
@@ -113,17 +112,17 @@ const ImageEditorProvide = ({ children }) => {
           cancelAnimationFrame(animationId);
         }
 
-        if (!isDragging.current) {
+        if (!isDragging) {
           animationId = window.requestAnimationFrame(applySettings);
         }
         ctx.restore();
       }
     },
-    [cropRect, settings]
+    [cropRect, settings, isDragging]
   );
 
   const mouseDown = useCallback((e) => {
-    isDragging.current = true;
+    setIsDragging(true);
     const rect = canvasRef.current.getBoundingClientRect();
     setCropRect((prev) => ({
       ...prev,
@@ -134,15 +133,15 @@ const ImageEditorProvide = ({ children }) => {
 
   const mouseMove = useCallback(
     (e) => {
-      if (isDragging.current) {
+      if (isDragging) {
         applySettings(true, e);
       }
     },
-    [applySettings]
+    [applySettings, isDragging]
   );
 
   const mouseUp = useCallback(() => {
-    isDragging.current = false;
+    setIsDragging(false);
     setDisabledCropBtn(false);
   }, []);
 
