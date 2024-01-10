@@ -12,7 +12,7 @@ const ImageEditorProvide = ({ children }) => {
   const [imageName, setImageName] = useState("");
   const [settings, setSettings] = useState({
     grayscale: 0,
-    brightness: 0,
+    brightness: 100,
     saturation: 100,
     inversion: 0,
     rotate: 0,
@@ -48,46 +48,36 @@ const ImageEditorProvide = ({ children }) => {
     if (dropZone) dropZone.classList.remove("highlight");
   };
 
-  const getImageBrightness = useCallback(() => {
+  const drawImage = useCallback(() => {
     const img = imageRef.current;
-    if (!img) return null;
 
-    // let alphaSum = 0;
-    let colorSum = 0;
+    const cansvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    const imgWidth = img.width;
+    const imgHeight = img.height;
 
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0);
+    const scaleFactor = Math.min(
+      cansvasWidth / imgWidth,
+      canvasHeight / imgHeight
+    );
+    const newWidth = imgWidth * scaleFactor;
+    const newHeight = imgHeight * scaleFactor;
 
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    let r, g, b, avg;
+    const x = (cansvasWidth - newWidth) / 2;
+    const y = (canvasHeight - newHeight) / 2;
 
-    for (let x = 0, len = data.length; x < len; x += 4) {
-      r = data[x];
-      g = data[x + 1];
-      b = data[x + 2];
-      // a = data[x + 3];
-
-      avg = Math.floor((r + g + b) / 3);
-      colorSum += avg;
-      // alphaSum += a;
-    }
-
-    const brightness = Math.floor(colorSum / (canvas.height * canvas.width));
-
-    return { brightness };
-  }, [canvas]);
+    ctx.clearRect(0, 0, cansvasWidth, canvasHeight);
+    ctx.save();
+    ctx.drawImage(img, x, y, newWidth, newHeight);
+  }, [canvas, ctx]);
 
   const applySettings = useCallback(
     (drawRect = false, e) => {
       if (canvas && ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.save();
-        ctx.translate(canvas.width / 2, canvas.height / 2);
         ctx.scale(settings.flipHorizontal, settings.flipVertical);
         ctx.rotate((settings.rotate * Math.PI) / 180);
         ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
-        ctx.drawImage(imageRef.current, -canvas.width / 2, -canvas.height / 2);
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        drawImage();
         ctx.filter = "none";
 
         if (typeof drawRect === "boolean" && drawRect) {
@@ -114,7 +104,7 @@ const ImageEditorProvide = ({ children }) => {
         ctx.restore();
       }
     },
-    [cropRect, settings, isDragging, canvas, ctx]
+    [cropRect, settings, isDragging, canvas, ctx, drawImage]
   );
 
   const mouseDown = useCallback(
@@ -243,14 +233,10 @@ const ImageEditorProvide = ({ children }) => {
   }
 
   const downloadImage = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.save();
-    ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.scale(settings.flipHorizontal, settings.flipVertical);
     ctx.rotate((settings.rotate * Math.PI) / 180);
     ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
-    ctx.drawImage(imageRef.current, -canvas.width / 2, -canvas.height / 2);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    drawImage;
     ctx.filter = "none";
 
     const trasnform = ctx.getTransform();
@@ -289,19 +275,10 @@ const ImageEditorProvide = ({ children }) => {
       setCrop({ x: 0, y: 0, width: 0, height: 0 });
       img.src = oldImage;
       setImage(oldImage);
-      const { brightness } = getImageBrightness();
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.save();
-      ctx.drawImage(
-        imageRef.current,
-        -canvas.width / 2,
-        -canvas.height / 2,
-        canvas.width,
-        canvas.height
-      );
+      drawImage();
       setSettings({
         grayscale: 0,
-        brightness,
+        brightness: 100,
         saturation: 100,
         inversion: 0,
         rotate: 0,
@@ -333,7 +310,6 @@ const ImageEditorProvide = ({ children }) => {
         return;
       }
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
       const trasnform = ctx.getTransform();
       ctx.resetTransform();
       ctx.translate(translateX, translateY);
@@ -358,16 +334,7 @@ const ImageEditorProvide = ({ children }) => {
   useEffect(() => {
     if (canvas) applySettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings]);
-
-  useEffect(() => {
-    if (image) {
-      setSettings((prev) => ({
-        ...prev,
-        ...getImageBrightness(),
-      }));
-    }
-  }, [image, getImageBrightness]);
+  }, [settings, image]);
 
   useAddCanvasListner({
     canvas,
