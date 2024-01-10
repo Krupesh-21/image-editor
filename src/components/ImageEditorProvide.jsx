@@ -31,6 +31,9 @@ const ImageEditorProvide = ({ children }) => {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
 
+  const canvas = canvasRef.current;
+  const ctx = ctxRef.current;
+
   const handleDragEnter = (e) => {
     const dropZone = document.getElementById("drag-drop-container");
     e.preventDefault();
@@ -45,14 +48,12 @@ const ImageEditorProvide = ({ children }) => {
     if (dropZone) dropZone.classList.remove("highlight");
   };
 
-  const getImageBrightness = () => {
+  const getImageBrightness = useCallback(() => {
     const img = imageRef.current;
     if (!img) return null;
 
     // let alphaSum = 0;
     let colorSum = 0;
-
-    const canvas = canvasRef.current;
 
     const ctx = canvas.getContext("2d");
     ctx.drawImage(img, 0, 0);
@@ -74,13 +75,10 @@ const ImageEditorProvide = ({ children }) => {
     const brightness = Math.floor(colorSum / (canvas.height * canvas.width));
 
     return { brightness };
-  };
+  }, [canvas]);
 
   const applySettings = useCallback(
     (drawRect = false, e) => {
-      const canvas = canvasRef.current;
-      const ctx = ctxRef.current;
-
       if (canvas && ctx) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.save();
@@ -93,14 +91,12 @@ const ImageEditorProvide = ({ children }) => {
         ctx.filter = "none";
 
         if (typeof drawRect === "boolean" && drawRect) {
-          const width =
-            e.pageX - canvasRef.current.offsetLeft - (cropRect?.startX || 0);
-          const height =
-            e.pageY - canvasRef.current.offsetTop - (cropRect?.startY || 0);
+          const width = e.pageX - canvas.offsetLeft - (cropRect?.startX || 0);
+          const height = e.pageY - canvas.offsetTop - (cropRect?.startY || 0);
           setCropRect((prev) => ({ ...prev, width, height }));
-          ctxRef.current.strokeStyle = "white";
-          ctxRef.current.lineWidth = 2;
-          ctxRef.current.strokeRect(
+          ctx.strokeStyle = "white";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(
             cropRect?.startX || 0,
             cropRect?.startY || 0,
             width,
@@ -118,18 +114,21 @@ const ImageEditorProvide = ({ children }) => {
         ctx.restore();
       }
     },
-    [cropRect, settings, isDragging]
+    [cropRect, settings, isDragging, canvas, ctx]
   );
 
-  const mouseDown = useCallback((e) => {
-    setIsDragging(true);
-    const rect = canvasRef.current.getBoundingClientRect();
-    setCropRect((prev) => ({
-      ...prev,
-      startX: e.clientX - rect.left,
-      startY: e.clientY - rect.top,
-    }));
-  }, []);
+  const mouseDown = useCallback(
+    (e) => {
+      setIsDragging(true);
+      const rect = canvas?.getBoundingClientRect();
+      setCropRect((prev) => ({
+        ...prev,
+        startX: e.clientX - rect.left,
+        startY: e.clientY - rect.top,
+      }));
+    },
+    [canvas]
+  );
 
   const mouseMove = useCallback(
     (e) => {
@@ -210,15 +209,12 @@ const ImageEditorProvide = ({ children }) => {
   function createCropPreview(img, isFromDrag = false) {
     const scaleX = img.naturalWidth / img.width;
     const scaleY = img.naturalHeight / img.height;
-    const canvas = canvasRef.current;
 
     const width = (isFromDrag ? cropRect.width : crop.width) * scaleX;
     const height = (isFromDrag ? cropRect.height : crop.height) * scaleY;
 
     canvas.width = Math.ceil(width);
     canvas.height = Math.ceil(height);
-
-    const ctx = ctxRef.current;
 
     ctx.drawImage(
       img,
@@ -247,9 +243,6 @@ const ImageEditorProvide = ({ children }) => {
   }
 
   const downloadImage = () => {
-    const canvas = canvasRef.current;
-    const ctx = ctxRef.current;
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -290,8 +283,6 @@ const ImageEditorProvide = ({ children }) => {
 
   const reset = () => {
     const img = imageRef.current;
-    const canvas = canvasRef.current;
-    const ctx = ctxRef.current;
     if (img && oldImage && canvas) {
       canvas.width = 1000;
       canvas.height = 500;
@@ -323,7 +314,6 @@ const ImageEditorProvide = ({ children }) => {
   const handleZoomInAndOut = useCallback(
     (e) => {
       const zoomStep = 0.02;
-      const canvas = canvasRef.current;
 
       e.preventDefault();
 
@@ -336,20 +326,20 @@ const ImageEditorProvide = ({ children }) => {
       _zoomScale = Math.min(zoomScale * zoom, 30);
 
       if (_zoomScale <= 1) {
-        ctxRef.current.resetTransform();
+        ctx.resetTransform();
         _zoomScale = 1;
         setZoomScale(_zoomScale);
         applySettings();
         return;
       }
 
-      ctxRef.current.clearRect(0, 0, canvas.width, canvas.height);
-      const trasnform = ctxRef.current.getTransform();
-      ctxRef.current.resetTransform();
-      ctxRef.current.translate(translateX, translateY);
-      ctxRef.current.scale(zoom, zoom);
-      ctxRef.current.translate(-translateX, -translateY);
-      ctxRef.current.transform(
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const trasnform = ctx.getTransform();
+      ctx.resetTransform();
+      ctx.translate(translateX, translateY);
+      ctx.scale(zoom, zoom);
+      ctx.translate(-translateX, -translateY);
+      ctx.transform(
         trasnform.a,
         trasnform.b,
         trasnform.c,
@@ -362,11 +352,11 @@ const ImageEditorProvide = ({ children }) => {
       setZoomScale(_zoomScale);
       applySettings();
     },
-    [applySettings, zoomScale]
+    [applySettings, zoomScale, canvas, ctx]
   );
 
   useEffect(() => {
-    if (canvasRef.current) applySettings();
+    if (canvas) applySettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
 
@@ -377,10 +367,10 @@ const ImageEditorProvide = ({ children }) => {
         ...getImageBrightness(),
       }));
     }
-  }, [image]);
+  }, [image, getImageBrightness]);
 
   useAddCanvasListner({
-    canvas: canvasRef.current,
+    canvas,
     mouseDown,
     mouseMove,
     mouseUp,
