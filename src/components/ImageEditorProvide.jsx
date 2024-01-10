@@ -56,7 +56,7 @@ const ImageEditorProvide = ({ children }) => {
     const canvas = canvasRef.current;
 
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0);
+    ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2);
 
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     let r, g, b, avg;
@@ -333,7 +333,7 @@ const ImageEditorProvide = ({ children }) => {
       const wheel = e.deltaY < 0 ? 1 : -1;
 
       const zoom = Math.exp(wheel * zoomStep);
-      zoomScale.current = Math.min(zoomScale * zoom, 30);
+      zoomScale.current = Math.min(zoomScale.current * zoom, 30);
 
       if (zoomScale.current <= 1) {
         ctxRef.current.resetTransform();
