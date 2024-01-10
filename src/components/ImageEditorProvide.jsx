@@ -378,6 +378,11 @@ const ImageEditorProvide = ({ children }) => {
         canvasRef.current.removeEventListener("mousedown", mouseDown, false);
         canvasRef.current.removeEventListener("mousemove", mouseMove, false);
         canvasRef.current.removeEventListener("mouseup", mouseUp, false);
+        canvasRef.current.removeEventListener(
+          "wheel",
+          handleZoomInAndOut,
+          true
+        );
       }
     };
   }, [canvasRef.current, mouseDown, mouseMove, mouseUp]);
