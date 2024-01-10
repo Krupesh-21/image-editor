@@ -1,5 +1,6 @@
 import PropTypes from "prop-types";
 import { createContext, useCallback, useEffect, useRef, useState } from "react";
+import useAddCanvasListner from "./useAddCanvasListner";
 
 export const ImageEditorContext = createContext(null);
 
@@ -54,7 +55,7 @@ const ImageEditorProvide = ({ children }) => {
     const canvas = canvasRef.current;
 
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2);
+    ctx.drawImage(img, 0, 0);
 
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     let r, g, b, avg;
@@ -378,24 +379,13 @@ const ImageEditorProvide = ({ children }) => {
     }
   }, [image]);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      canvas.addEventListener("mousedown", mouseDown, false);
-      canvas.addEventListener("mousemove", mouseMove, false);
-      canvas.addEventListener("mouseup", mouseUp, false);
-      canvas.addEventListener("wheel", handleZoomInAndOut, true);
-    }
-
-    return () => {
-      if (canvas) {
-        canvas.removeEventListener("mousedown", mouseDown, false);
-        canvas.removeEventListener("mousemove", mouseMove, false);
-        canvas.removeEventListener("mouseup", mouseUp, false);
-        canvas.removeEventListener("wheel", handleZoomInAndOut, true);
-      }
-    };
-  }, [mouseDown, mouseMove, mouseUp, handleZoomInAndOut]);
+  useAddCanvasListner({
+    canvas: canvasRef.current,
+    mouseDown,
+    mouseMove,
+    mouseUp,
+    handleZoomInAndOut,
+  });
 
   return (
     <ImageEditorContext.Provider
