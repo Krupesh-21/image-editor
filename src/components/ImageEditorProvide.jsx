@@ -20,14 +20,20 @@ const ImageEditorProvide = ({ children }) => {
     flipVertical: 1,
   });
   const [crop, setCrop] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const [cropRect, setCropRect] = useState({});
+  const [cropRect, setCropRect] = useState({
+    startX: 0,
+    startY: 0,
+    endX: 0,
+    endY: 0,
+  });
   const [disabledCropBtn, setDisabledCropBtn] = useState(true);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
+  const [cropBox, setCropBox] = useState(false);
 
-  const cropDimension = useRef({ startX: 0, startY: 0, endX: 0, endY: 0 });
+  const cropDimension = useRef({ startX: 100, startY: 100, endX: 0, endY: 0 });
 
   const imageRef = useRef(null);
   const canvasRef = useRef(null);
@@ -73,24 +79,43 @@ const ImageEditorProvide = ({ children }) => {
 
   const drawCropBox = useCallback(
     (e) => {
-      const width = e.pageX - canvas.offsetLeft - (cropRect?.startX || 0);
-      const height = e.pageY - canvas.offsetTop - (cropRect?.startY || 0);
+      const width = e
+        ? e.pageX - canvas.offsetLeft - (cropRect?.startX || 0)
+        : 150;
+      const height = e
+        ? e.pageY - canvas.offsetTop - (cropRect?.startY || 0)
+        : 150;
 
       const { startX, startY } = cropDimension.current;
-      setCropRect((prev) => ({ ...prev, width, height }));
+      const x = e ? startX : canvas.width / 2 - 150 / 2;
+      const y = e ? startY : canvas.height / 2 - 150 / 2;
+      setCropRect((prev) => ({
+        ...prev,
+        width,
+        height,
+        startX: x,
+        startY: y,
+        endX: e ? prev.endX : x,
+        endY: e ? prev.endY : y,
+      }));
       ctx.strokeStyle = "white";
       ctx.lineWidth = 2;
       ctx.strokeRect(startX, startY, width, height);
 
       cropDimension.current = {
         ...cropDimension.current,
-        endX: e.offsetX,
-        endY: e.offsetY,
+        endX: e ? e.offsetX : x,
+        endY: e ? e.offsetY : y,
         croppedWidth: width,
         croppedHeight: height,
+        startX: x,
+        startY: y,
       };
+      if (cropBox) {
+        setDisabledCropBtn(false);
+      }
     },
-    [canvas, cropRect, ctx]
+    [canvas, cropRect, ctx, cropBox]
   );
 
   const applySettings = useCallback(
@@ -108,7 +133,8 @@ const ImageEditorProvide = ({ children }) => {
         ctx.canvas.style.boxShadow = "rgba(0, 0, 0, 0.15) 0px 2px 8px";
         ctx.canvas.style.backgroundColor = "white";
 
-        if (drawRect && typeof drawRect === "boolean") drawCropBox(e);
+        if ((drawRect && typeof drawRect === "boolean") || cropBox)
+          drawCropBox(e);
 
         if (animationId) {
           cancelAnimationFrame(animationId);
@@ -120,7 +146,7 @@ const ImageEditorProvide = ({ children }) => {
         ctx.restore();
       }
     },
-    [settings, isDragging, canvas, ctx, drawImage, drawCropBox]
+    [settings, isDragging, canvas, ctx, drawImage, drawCropBox, cropBox]
   );
 
   const mouseDown = useCallback(
@@ -136,9 +162,12 @@ const ImageEditorProvide = ({ children }) => {
         ...prev,
         startX: e.clientX - rect.left,
         startY: e.clientY - rect.top,
+        endX: cropBox ? 0 : prev.endX,
+        endY: cropBox ? 0 : prev.endY,
       }));
+      setCropBox(false);
     },
-    [canvas]
+    [canvas, cropBox]
   );
 
   const mouseMove = useCallback(
@@ -187,7 +216,6 @@ const ImageEditorProvide = ({ children }) => {
         imageRef.current = img;
         if (previewContainer) previewContainer.style.display = "grid";
         if (imagePreview) {
-          // imagePreview.appendChild(img);
           imagePreview.appendChild(canvas);
         }
         setOldImage(e.target.result);
@@ -239,6 +267,9 @@ const ImageEditorProvide = ({ children }) => {
       imageRef.current = img;
     }
     setDisabledCropBtn(true);
+    if (cropBox) {
+      toggleCropBox();
+    }
     if (animationId) cancelAnimationFrame(animationId);
     animationId = requestAnimationFrame(applySettings);
   }
@@ -321,10 +352,49 @@ const ImageEditorProvide = ({ children }) => {
     [applySettings, zoomScale, canvas, ctx]
   );
 
+  const toggleCropBox = useCallback(() => {
+    setCropBox((prev) => !prev);
+  }, []);
+
   useEffect(() => {
     if (canvas) applySettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings, image]);
+  }, [settings, image, cropBox]);
+
+  useEffect(() => {
+    const cropImageBtn = document.getElementById("crop-box-btn");
+    window.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (canvas) {
+        const hasClickedOutside =
+          !canvas?.contains(e.target) && !cropImageBtn.contains(e.target);
+        if (hasClickedOutside) {
+          if (cropBox) {
+            setCropBox(false);
+          } else {
+            setSettings((prev) => ({ ...prev }));
+          }
+        }
+      }
+    });
+
+    return () => {
+      window.removeEventListener("click", (e) => {
+        e.stopPropagation();
+        if (canvas) {
+          const hasClickedOutside =
+            !canvas?.contains(e.target) && !cropImageBtn.contains(e.target);
+          if (hasClickedOutside) {
+            if (cropBox) {
+              setCropBox(false);
+            } else {
+              setSettings((prev) => ({ ...prev }));
+            }
+          }
+        }
+      });
+    };
+  }, [canvas, cropBox]);
 
   useAddCanvasListner({
     canvas,
@@ -353,6 +423,8 @@ const ImageEditorProvide = ({ children }) => {
         displayFiles,
         cropSelectedArea,
         disabledCropBtn,
+        toggleCropBox,
+        cropBox,
       }}
     >
       {children}
