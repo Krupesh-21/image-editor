@@ -25,7 +25,7 @@ const Flip = () => {
       >
         Flip Y
       </button>
-      <button
+      {/* <button
         onClick={() => {
           setSettings((prev) => ({
             ...prev,
@@ -44,7 +44,7 @@ const Flip = () => {
         }}
       >
         Rotate Right
-      </button>
+      </button> */}
     </div>
   );
 };

@@ -27,8 +27,6 @@ const ImageEditorProvide = ({ children }) => {
     endY: 0,
   });
   const [disabledCropBtn, setDisabledCropBtn] = useState(true);
-  const [translate, setTranslate] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
   const [cropBox, setCropBox] = useState(false);
@@ -74,8 +72,14 @@ const ImageEditorProvide = ({ children }) => {
     const x = (canvasWidth - newWidth) / 2;
     const y = (canvasHeight - newHeight) / 2;
 
-    ctx.drawImage(img, x, y, newWidth, newHeight);
-  }, [canvas, ctx]);
+    ctx.drawImage(
+      img,
+      x * settings.flipHorizontal,
+      y * settings.flipVertical,
+      newWidth * settings.flipHorizontal,
+      newHeight * settings.flipVertical
+    );
+  }, [canvas, ctx, settings]);
 
   const drawCropBox = useCallback(
     (e) => {
@@ -123,7 +127,7 @@ const ImageEditorProvide = ({ children }) => {
       if (canvas && ctx) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.save();
-        // ctx.scale(settings.flipHorizontal, settings.flipVertical);
+        ctx.scale(settings.flipHorizontal, settings.flipVertical);
         // ctx.rotate((settings.rotate * Math.PI) / 180);
         ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
         drawImage();
@@ -344,8 +348,6 @@ const ImageEditorProvide = ({ children }) => {
         trasnform.e,
         trasnform.f
       );
-      setTranslate((prev) => ({ ...prev, x: translateX, y: translateY }));
-      setZoom(zoom);
       setZoomScale(_zoomScale);
       applySettings();
     },

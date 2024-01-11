@@ -1,4 +1,5 @@
 import { useContext } from "react";
+import Flip from "./Flip";
 import { ImageEditorContext } from "./ImageEditorProvide";
 import Settings from "./Settings";
 
@@ -13,7 +14,7 @@ const ImagePreview = () => {
             Crop Image
           </button>
         </div>
-        {/* <Flip /> */}
+        <Flip />
       </div>
       <div id="image-preview"></div>
     </div>
