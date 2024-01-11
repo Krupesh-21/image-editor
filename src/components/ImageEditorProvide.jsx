@@ -27,6 +27,8 @@ const ImageEditorProvide = ({ children }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
 
+  const cropDimension = useRef({ startX: 0, startY: 0, endX: 0, endY: 0 });
+
   const imageRef = useRef(null);
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
@@ -66,32 +68,47 @@ const ImageEditorProvide = ({ children }) => {
     const x = (canvasWidth - newWidth) / 2;
     const y = (canvasHeight - newHeight) / 2;
 
-    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-    ctx.save();
     ctx.drawImage(img, x, y, newWidth, newHeight);
   }, [canvas, ctx]);
 
-  const drawCropBox = (e) => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.save();
-    const width = e.pageX - canvas.offsetLeft - (cropRect?.startX || 0);
-    const height = e.pageY - canvas.offsetTop - (cropRect?.startY || 0);
-    setCropRect((prev) => ({ ...prev, width, height }));
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(cropRect?.startX || 0, cropRect?.startY || 0, width, height);
+  const drawCropBox = useCallback(
+    (e) => {
+      const width = e.pageX - canvas.offsetLeft - (cropRect?.startX || 0);
+      const height = e.pageY - canvas.offsetTop - (cropRect?.startY || 0);
 
-    ctx.restore();
-  };
+      const { startX, startY } = cropDimension.current;
+      setCropRect((prev) => ({ ...prev, width, height }));
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(startX, startY, width, height);
+
+      cropDimension.current = {
+        ...cropDimension.current,
+        endX: e.offsetX,
+        endY: e.offsetY,
+        croppedWidth: width,
+        croppedHeight: height,
+      };
+    },
+    [canvas, cropRect, ctx]
+  );
 
   const applySettings = useCallback(
     (drawRect = false, e) => {
       if (canvas && ctx) {
-        ctx.scale(settings.flipHorizontal, settings.flipVertical);
-        ctx.rotate((settings.rotate * Math.PI) / 180);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        // ctx.scale(settings.flipHorizontal, settings.flipVertical);
+        // ctx.rotate((settings.rotate * Math.PI) / 180);
         ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
         drawImage();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.filter = "none";
+
+        ctx.canvas.style.boxShadow = "rgba(0, 0, 0, 0.15) 0px 2px 8px";
+        ctx.canvas.style.backgroundColor = "white";
+
+        if (drawRect && typeof drawRect === "boolean") drawCropBox(e);
 
         if (animationId) {
           cancelAnimationFrame(animationId);
@@ -101,18 +118,20 @@ const ImageEditorProvide = ({ children }) => {
           animationId = window.requestAnimationFrame(applySettings);
         }
         ctx.restore();
-        if (typeof drawRect === "boolean" && drawRect) {
-          drawCropBox(e);
-        }
       }
     },
-    [cropRect, settings, isDragging, canvas, ctx, drawImage, drawCropBox]
+    [settings, isDragging, canvas, ctx, drawImage, drawCropBox]
   );
 
   const mouseDown = useCallback(
     (e) => {
       setIsDragging(true);
       const rect = canvas?.getBoundingClientRect();
+      cropDimension.current = {
+        ...cropDimension.current,
+        startX: e.clientX - rect.left,
+        startY: e.clientY - rect.top,
+      };
       setCropRect((prev) => ({
         ...prev,
         startX: e.clientX - rect.left,
@@ -128,7 +147,7 @@ const ImageEditorProvide = ({ children }) => {
         applySettings(true, e);
       }
     },
-    [applySettings, isDragging]
+    [isDragging, applySettings]
   );
 
   const mouseUp = useCallback(() => {
@@ -198,36 +217,26 @@ const ImageEditorProvide = ({ children }) => {
     setCrop((prev) => ({ ...prev, [name]: value.trim() ? Number(value) : 0 }));
   };
 
-  function createCropPreview(img, isFromDrag = false) {
-    const scaleX = img.naturalWidth / img.width;
-    const scaleY = img.naturalHeight / img.height;
+  function createCropPreview() {
+    const { startX, startY, endX, endY, croppedWidth, croppedHeight } =
+      cropDimension.current || {};
 
-    const width = (isFromDrag ? cropRect.width : crop.width) * scaleX;
-    const height = (isFromDrag ? cropRect.height : crop.height) * scaleY;
+    const sx = Math.min(startX, endX);
+    const sy = Math.min(startY, endY);
+    const dx = canvas.width / 2 - croppedWidth / 2;
+    const dy = canvas.height / 2 - croppedHeight / 2;
 
-    canvas.width = Math.ceil(width);
-    canvas.height = Math.ceil(height);
+    const data = ctx.getImageData(sx, sy, croppedWidth, croppedHeight);
 
-    ctx.drawImage(
-      img,
-      (isFromDrag ? cropRect.startX : crop.x) * scaleX,
-      (isFromDrag ? cropRect.startY : crop.y) * scaleY,
-      width,
-      height,
-      0,
-      0,
-      canvas.width * scaleX,
-      canvas.height * scaleY
-    );
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.putImageData(data, dx, dy);
 
     const dataUrl = canvas.toDataURL();
-    // const previewImage = document.getElementById("preview-image");
     if (dataUrl !== "data:,") {
       setImage(dataUrl);
       const img = document.createElement("img");
       img.src = dataUrl;
       imageRef.current = img;
-      setCrop({ x: 0, y: 0, width: 0, height: 0 });
     }
     setDisabledCropBtn(true);
     if (animationId) cancelAnimationFrame(animationId);
@@ -235,27 +244,6 @@ const ImageEditorProvide = ({ children }) => {
   }
 
   const downloadImage = () => {
-    ctx.scale(settings.flipHorizontal, settings.flipVertical);
-    ctx.rotate((settings.rotate * Math.PI) / 180);
-    ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
-    drawImage;
-    ctx.filter = "none";
-
-    const trasnform = ctx.getTransform();
-    ctx.resetTransform();
-    ctx.translate(translate.x, translate.y);
-    ctx.scale(zoom, zoom);
-    ctx.translate(-translate.x, -translate.y);
-    ctx.transform(
-      trasnform.a,
-      trasnform.b,
-      trasnform.c,
-      trasnform.d,
-      trasnform.e,
-      trasnform.f
-    );
-    ctx.restore();
-
     const link = document.createElement("a");
     link.download = imageName;
     link.href = canvas.toDataURL();

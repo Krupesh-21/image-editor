@@ -1,5 +1,3 @@
-import Crop from "./Crop";
-import Flip from "./Flip";
 import Settings from "./Settings";
 
 const ImagePreview = () => {
@@ -7,8 +5,7 @@ const ImagePreview = () => {
     <div className="image-preview-container">
       <div id="settings-container">
         <Settings />
-        <Crop />
-        <Flip />
+        {/* <Flip /> */}
       </div>
       <div id="image-preview"></div>
     </div>
