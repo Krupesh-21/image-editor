@@ -213,12 +213,16 @@ const ImageEditorProvide = ({ children }) => {
         const img = document.createElement("img");
         img.src = e.target.result;
         img.id = "preview-image";
-        canvas.width = 1000;
-        canvas.height = 500;
+        if (previewContainer) previewContainer.style.display = "grid";
+
+        const { width, height } = imagePreview.getBoundingClientRect();
+
+        canvas.width = width;
+        canvas.height = height;
+
         canvasRef.current = canvas;
         ctxRef.current = ctx;
         imageRef.current = img;
-        if (previewContainer) previewContainer.style.display = "grid";
         if (imagePreview) {
           imagePreview.appendChild(canvas);
         }
