@@ -82,6 +82,7 @@ const ImageEditorProvide = ({ children }) => {
         newWidth * settings.flipHorizontal,
         newHeight * settings.flipVertical
       );
+      setCurrentCoordinates({ x, y, width: newWidth, height: newHeight });
     },
     [canvas, ctx, settings]
   );
@@ -96,8 +97,10 @@ const ImageEditorProvide = ({ children }) => {
         : 150;
 
       const { startX, startY } = cropDimension.current;
+
       const x = e ? startX : canvas.width / 2 - 150 / 2;
       const y = e ? startY : canvas.height / 2 - 150 / 2;
+
       setCropRect((prev) => ({
         ...prev,
         width,
@@ -136,8 +139,8 @@ const ImageEditorProvide = ({ children }) => {
         ctx.scale(settings.flipHorizontal, settings.flipVertical);
         // ctx.rotate((settings.rotate * Math.PI) / 180);
         ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
-        const x = e ? e.pageX - canvas.offsetLeft : 0;
-        const y = e ? e.pageY - canvas.offsetTop : 0;
+        const x = e ? e.pageX - canvas.offsetLeft : currentCoordinates.x;
+        const y = e ? e.pageY - canvas.offsetTop : currentCoordinates.y;
         drawImage(x, y, isImageDragging);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.filter = "none";
@@ -146,7 +149,7 @@ const ImageEditorProvide = ({ children }) => {
         ctx.canvas.style.backgroundColor = "white";
 
         if ((drawRect && typeof drawRect === "boolean") || cropBox)
-          drawCropBox(e);
+          drawCropBox(e, x, y, isImageDragging);
         if (animationId) {
           cancelAnimationFrame(animationId);
         }
@@ -157,7 +160,16 @@ const ImageEditorProvide = ({ children }) => {
         ctx.restore();
       }
     },
-    [settings, isDragging, canvas, ctx, drawImage, drawCropBox, cropBox]
+    [
+      settings,
+      isDragging,
+      canvas,
+      ctx,
+      drawImage,
+      drawCropBox,
+      cropBox,
+      currentCoordinates,
+    ]
   );
 
   const mouseDown = useCallback(
@@ -220,13 +232,6 @@ const ImageEditorProvide = ({ children }) => {
       const mouseY = e.pageY - canvas.offsetTop;
       const { x, y } = currentCoordinates;
       const img = imageRef.current;
-      console.log(
-        mouseX >= x - img.width / 2 &&
-          mouseX <= x + img.width / 2 &&
-          mouseY >= y - img.height / 2 &&
-          mouseY <= y + img.height / 2 &&
-          !cropBox
-      );
       if (
         mouseX >= x - img.width / 2 &&
         mouseX <= x + img.width / 2 &&
@@ -327,7 +332,12 @@ const ImageEditorProvide = ({ children }) => {
       imageRef.current = img;
     }
     setDisabledCropBtn(true);
-    setCurrentCoordinates({ x: sx, y: sy });
+    setCurrentCoordinates({
+      x: sx,
+      y: sy,
+      width: croppedWidth,
+      height: croppedHeight,
+    });
     if (cropBox) {
       toggleCropBox();
     }
@@ -369,11 +379,12 @@ const ImageEditorProvide = ({ children }) => {
   const handleZoomInAndOut = useCallback(
     (e) => {
       const zoomStep = 0.02;
+      const { x, y } = currentCoordinates;
 
       e.preventDefault();
 
-      const translateX = e.clientX - canvas.offsetLeft;
-      const translateY = e.clientY - canvas.offsetTop;
+      const translateX = x || e.clientX - canvas.offsetLeft;
+      const translateY = y || e.clientY - canvas.offsetTop;
       const wheel = e.deltaY < 0 ? 1 : -1;
 
       const zoom = Math.exp(wheel * zoomStep);
@@ -404,7 +415,7 @@ const ImageEditorProvide = ({ children }) => {
       setZoomScale(_zoomScale);
       applySettings();
     },
-    [applySettings, zoomScale, canvas, ctx]
+    [applySettings, zoomScale, canvas, ctx, currentCoordinates]
   );
 
   const toggleCropBox = useCallback(() => {
@@ -423,19 +434,15 @@ const ImageEditorProvide = ({ children }) => {
       if (canvas) {
         const hasClickedOutside =
           !canvas?.contains(e.target) && !cropImageBtn.contains(e.target);
-        if (hasClickedOutside) {
-          if (cropBox) {
-            setCropBox(false);
-            setDisabledCropBtn(true);
-            cropDimension.current = {
-              startX: 100,
-              startY: 100,
-              endX: 0,
-              endY: 0,
-            };
-          } else {
-            setSettings((prev) => ({ ...prev }));
-          }
+        if (hasClickedOutside && cropBox) {
+          setCropBox(false);
+          setDisabledCropBtn(true);
+          cropDimension.current = {
+            startX: 100,
+            startY: 100,
+            endX: 0,
+            endY: 0,
+          };
         }
       }
     });
@@ -446,19 +453,15 @@ const ImageEditorProvide = ({ children }) => {
         if (canvas) {
           const hasClickedOutside =
             !canvas?.contains(e.target) && !cropImageBtn.contains(e.target);
-          if (hasClickedOutside) {
-            if (cropBox) {
-              setCropBox(false);
-              setDisabledCropBtn(true);
-              cropDimension.current = {
-                startX: 100,
-                startY: 100,
-                endX: 0,
-                endY: 0,
-              };
-            } else {
-              setSettings((prev) => ({ ...prev }));
-            }
+          if (hasClickedOutside && cropBox) {
+            setCropBox(false);
+            setDisabledCropBtn(true);
+            cropDimension.current = {
+              startX: 100,
+              startY: 100,
+              endX: 0,
+              endY: 0,
+            };
           }
         }
       });
