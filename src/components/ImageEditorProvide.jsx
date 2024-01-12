@@ -30,6 +30,8 @@ const ImageEditorProvide = ({ children }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
   const [cropBox, setCropBox] = useState(false);
+  const [isImageDragging, setIsImageDragging] = useState(false);
+  const [currentCoordinates, setCurrentCoordinates] = useState({ x: 0, y: 0 });
 
   const cropDimension = useRef({ startX: 100, startY: 100, endX: 0, endY: 0 });
 
@@ -54,32 +56,35 @@ const ImageEditorProvide = ({ children }) => {
     if (dropZone) dropZone.classList.remove("highlight");
   };
 
-  const drawImage = useCallback(() => {
-    const img = imageRef.current;
+  const drawImage = useCallback(
+    (x, y, isDragging) => {
+      const img = imageRef.current;
 
-    const canvasWidth = canvas.width;
-    const canvasHeight = canvas.height;
-    const imgWidth = img.width;
-    const imgHeight = img.height;
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const imgWidth = img.width;
+      const imgHeight = img.height;
 
-    const scaleFactor = Math.min(
-      canvasWidth / imgWidth,
-      canvasHeight / imgHeight
-    );
-    const newWidth = imgWidth * scaleFactor;
-    const newHeight = imgHeight * scaleFactor;
+      const scaleFactor = Math.min(
+        canvasWidth / imgWidth,
+        canvasHeight / imgHeight
+      );
+      const newWidth = imgWidth * scaleFactor;
+      const newHeight = imgHeight * scaleFactor;
 
-    const x = (canvasWidth - newWidth) / 2;
-    const y = (canvasHeight - newHeight) / 2;
+      x = isDragging ? x - newWidth / 2 : (canvasWidth - newWidth) / 2;
+      y = isDragging ? y - newHeight / 2 : (canvasHeight - newHeight) / 2;
 
-    ctx.drawImage(
-      img,
-      x * settings.flipHorizontal,
-      y * settings.flipVertical,
-      newWidth * settings.flipHorizontal,
-      newHeight * settings.flipVertical
-    );
-  }, [canvas, ctx, settings]);
+      ctx.drawImage(
+        img,
+        x * settings.flipHorizontal,
+        y * settings.flipVertical,
+        newWidth * settings.flipHorizontal,
+        newHeight * settings.flipVertical
+      );
+    },
+    [canvas, ctx, settings]
+  );
 
   const drawCropBox = useCallback(
     (e) => {
@@ -115,6 +120,7 @@ const ImageEditorProvide = ({ children }) => {
         startX: x,
         startY: y,
       };
+
       if (cropBox) {
         setDisabledCropBtn(false);
       }
@@ -123,14 +129,16 @@ const ImageEditorProvide = ({ children }) => {
   );
 
   const applySettings = useCallback(
-    (drawRect = false, e) => {
+    (drawRect = false, e, isImageDragging = false) => {
       if (canvas && ctx) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.save();
         ctx.scale(settings.flipHorizontal, settings.flipVertical);
         // ctx.rotate((settings.rotate * Math.PI) / 180);
         ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
-        drawImage();
+        const x = e ? e.pageX - canvas.offsetLeft : 0;
+        const y = e ? e.pageY - canvas.offsetTop : 0;
+        drawImage(x, y, isImageDragging);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.filter = "none";
 
@@ -139,12 +147,11 @@ const ImageEditorProvide = ({ children }) => {
 
         if ((drawRect && typeof drawRect === "boolean") || cropBox)
           drawCropBox(e);
-
         if (animationId) {
           cancelAnimationFrame(animationId);
         }
 
-        if (!isDragging) {
+        if (!isDragging && !isImageDragging) {
           animationId = window.requestAnimationFrame(applySettings);
         }
         ctx.restore();
@@ -155,38 +162,83 @@ const ImageEditorProvide = ({ children }) => {
 
   const mouseDown = useCallback(
     (e) => {
-      setIsDragging(true);
-      const rect = canvas?.getBoundingClientRect();
-      cropDimension.current = {
-        ...cropDimension.current,
-        startX: e.clientX - rect.left,
-        startY: e.clientY - rect.top,
-      };
-      setCropRect((prev) => ({
-        ...prev,
-        startX: e.clientX - rect.left,
-        startY: e.clientY - rect.top,
-        endX: cropBox ? 0 : prev.endX,
-        endY: cropBox ? 0 : prev.endY,
-      }));
+      const mouseX = e.pageX - canvas.offsetLeft;
+      const mouseY = e.pageY - canvas.offsetTop;
+      const { x, y } = currentCoordinates;
+      const img = imageRef.current;
+      if (
+        mouseX >= x - img.width / 2 &&
+        mouseX <= x + img.width / 2 &&
+        mouseY >= y - img.height / 2 &&
+        mouseY <= y + img.height / 2 &&
+        !cropBox
+      ) {
+        setIsImageDragging(true);
+      } else if (cropBox) {
+        setIsDragging(true);
+        const rect = canvas?.getBoundingClientRect();
+        cropDimension.current = {
+          ...cropDimension.current,
+          startX: e.clientX - rect.left,
+          startY: e.clientY - rect.top,
+        };
+        setCropRect((prev) => ({
+          ...prev,
+          startX: e.clientX - rect.left,
+          startY: e.clientY - rect.top,
+          endX: cropBox ? 0 : prev.endX,
+          endY: cropBox ? 0 : prev.endY,
+        }));
+      }
       setCropBox(false);
     },
-    [canvas, cropBox]
+    [canvas, cropBox, currentCoordinates]
   );
 
   const mouseMove = useCallback(
     (e) => {
-      if (isDragging) {
-        applySettings(true, e);
+      if (isDragging || isImageDragging) {
+        applySettings(isDragging, e, !isDragging && isImageDragging);
+        if (!isDragging && isImageDragging) canvas.style.cursor = "move";
       }
     },
-    [isDragging, applySettings]
+    [isDragging, applySettings, isImageDragging, canvas]
   );
 
   const mouseUp = useCallback(() => {
-    setIsDragging(false);
-    setDisabledCropBtn(false);
-  }, []);
+    if (isDragging && !isImageDragging) {
+      setIsDragging(false);
+      setDisabledCropBtn(false);
+    } else {
+      setIsImageDragging(false);
+    }
+  }, [isDragging, isImageDragging]);
+
+  const mouseOver = useCallback(
+    (e) => {
+      const mouseX = e.pageX - canvas.offsetLeft;
+      const mouseY = e.pageY - canvas.offsetTop;
+      const { x, y } = currentCoordinates;
+      const img = imageRef.current;
+      console.log(
+        mouseX >= x - img.width / 2 &&
+          mouseX <= x + img.width / 2 &&
+          mouseY >= y - img.height / 2 &&
+          mouseY <= y + img.height / 2 &&
+          !cropBox
+      );
+      if (
+        mouseX >= x - img.width / 2 &&
+        mouseX <= x + img.width / 2 &&
+        mouseY >= y - img.height / 2 &&
+        mouseY <= y + img.height / 2 &&
+        !cropBox
+      ) {
+        canvas.style.cursor = "move";
+      }
+    },
+    [canvas, cropBox, currentCoordinates]
+  );
 
   const cropSelectedArea = () => {
     createCropPreview(imageRef.current, true);
@@ -275,11 +327,10 @@ const ImageEditorProvide = ({ children }) => {
       imageRef.current = img;
     }
     setDisabledCropBtn(true);
+    setCurrentCoordinates({ x: sx, y: sy });
     if (cropBox) {
       toggleCropBox();
     }
-    if (animationId) cancelAnimationFrame(animationId);
-    animationId = requestAnimationFrame(applySettings);
   }
 
   const downloadImage = () => {
@@ -375,6 +426,13 @@ const ImageEditorProvide = ({ children }) => {
         if (hasClickedOutside) {
           if (cropBox) {
             setCropBox(false);
+            setDisabledCropBtn(true);
+            cropDimension.current = {
+              startX: 100,
+              startY: 100,
+              endX: 0,
+              endY: 0,
+            };
           } else {
             setSettings((prev) => ({ ...prev }));
           }
@@ -391,6 +449,13 @@ const ImageEditorProvide = ({ children }) => {
           if (hasClickedOutside) {
             if (cropBox) {
               setCropBox(false);
+              setDisabledCropBtn(true);
+              cropDimension.current = {
+                startX: 100,
+                startY: 100,
+                endX: 0,
+                endY: 0,
+              };
             } else {
               setSettings((prev) => ({ ...prev }));
             }
@@ -405,6 +470,7 @@ const ImageEditorProvide = ({ children }) => {
     mouseDown,
     mouseMove,
     mouseUp,
+    mouseOver,
     handleZoomInAndOut,
   });
 
