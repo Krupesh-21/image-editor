@@ -299,8 +299,6 @@ const ImageEditorProvide = ({ children }) => {
   const reset = () => {
     const img = imageRef.current;
     if (img && oldImage && canvas) {
-      canvas.width = 1000;
-      canvas.height = 500;
       setCrop({ x: 0, y: 0, width: 0, height: 0 });
       img.src = oldImage;
       setImage(oldImage);
