@@ -1,17 +1,17 @@
 import "./App.css";
 import Footer from "./components/Footer";
-import ImageUpload from "./components/ImageUpload";
+import ImageEditorProvider from "./components/ImageEditorProvider";
 import ImagePreview from "./components/ImagePreview";
-import ImageEditorProvide from "./components/ImageEditorProvide";
+import ImageUpload from "./components/ImageUpload";
 
 function App() {
   return (
     <div className="container">
-      <ImageEditorProvide>
+      <ImageEditorProvider>
         <ImageUpload />
         <ImagePreview />
         <Footer />
-      </ImageEditorProvide>
+      </ImageEditorProvider>
     </div>
   );
 }

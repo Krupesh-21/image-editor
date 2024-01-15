@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { ImageEditorContext } from "./ImageEditorProvide";
+import { ImageEditorContext } from "./ImageEditorProvider";
 
 const Flip = () => {
   const { setSettings } = useContext(ImageEditorContext);

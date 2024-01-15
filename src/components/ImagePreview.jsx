@@ -1,6 +1,6 @@
 import { useContext } from "react";
 import Flip from "./Flip";
-import { ImageEditorContext } from "./ImageEditorProvide";
+import { ImageEditorContext } from "./ImageEditorProvider";
 import Settings from "./Settings";
 
 const ImagePreview = () => {

@@ -69,6 +69,7 @@ const ImageEditorProvide = ({ children }) => {
         canvasWidth / imgWidth,
         canvasHeight / imgHeight
       );
+
       const newWidth = imgWidth * scaleFactor;
       const newHeight = imgHeight * scaleFactor;
 
@@ -212,6 +213,7 @@ const ImageEditorProvide = ({ children }) => {
       if (isDragging || isImageDragging) {
         applySettings(isDragging, e, !isDragging && isImageDragging);
         if (!isDragging && isImageDragging) canvas.style.cursor = "move";
+        else canvas.style.cursor = "default";
       }
     },
     [isDragging, applySettings, isImageDragging, canvas]
@@ -240,6 +242,8 @@ const ImageEditorProvide = ({ children }) => {
         !cropBox
       ) {
         canvas.style.cursor = "move";
+      } else {
+        canvas.style.cursor = "default";
       }
     },
     [canvas, cropBox, currentCoordinates]
@@ -280,6 +284,7 @@ const ImageEditorProvide = ({ children }) => {
         canvasRef.current = canvas;
         ctxRef.current = ctx;
         imageRef.current = img;
+
         if (imagePreview) {
           imagePreview.appendChild(canvas);
         }
@@ -379,12 +384,11 @@ const ImageEditorProvide = ({ children }) => {
   const handleZoomInAndOut = useCallback(
     (e) => {
       const zoomStep = 0.02;
-      const { x, y } = currentCoordinates;
 
       e.preventDefault();
 
-      const translateX = x || e.clientX - canvas.offsetLeft;
-      const translateY = y || e.clientY - canvas.offsetTop;
+      const translateX = e.clientX - canvas.offsetLeft;
+      const translateY = e.clientY - canvas.offsetTop;
       const wheel = e.deltaY < 0 ? 1 : -1;
 
       const zoom = Math.exp(wheel * zoomStep);
@@ -415,7 +419,7 @@ const ImageEditorProvide = ({ children }) => {
       setZoomScale(_zoomScale);
       applySettings();
     },
-    [applySettings, zoomScale, canvas, ctx, currentCoordinates]
+    [applySettings, zoomScale, canvas, ctx]
   );
 
   const toggleCropBox = useCallback(() => {
@@ -425,7 +429,7 @@ const ImageEditorProvide = ({ children }) => {
   useEffect(() => {
     if (canvas) applySettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings, image, cropBox]);
+  }, [image, cropBox]);
 
   useEffect(() => {
     const cropImageBtn = document.getElementById("crop-box-btn");
