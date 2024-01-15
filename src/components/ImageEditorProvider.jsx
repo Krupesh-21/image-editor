@@ -429,7 +429,7 @@ const ImageEditorProvide = ({ children }) => {
   useEffect(() => {
     if (canvas) applySettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [image, cropBox]);
+  }, [settings, image, cropBox]);
 
   useEffect(() => {
     const cropImageBtn = document.getElementById("crop-box-btn");
