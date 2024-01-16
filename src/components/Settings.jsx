@@ -6,6 +6,8 @@ const options = [
   { name: "brightness", max: 200 },
   { name: "saturation", max: 200 },
   { name: "inversion", max: 100 },
+  { name: "exposure", max: 100 },
+  { name: "contrast", max: 100 },
 ];
 
 const Settings = () => {
