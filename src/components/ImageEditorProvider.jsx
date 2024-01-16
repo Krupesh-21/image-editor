@@ -5,7 +5,6 @@ import useAddCanvasListner from "./useAddCanvasListner";
 export const ImageEditorContext = createContext(null);
 
 let animationId = null;
-let timeout = null;
 
 const ImageEditorProvide = ({ children }) => {
   const [image, setImage] = useState(null);
@@ -14,13 +13,11 @@ const ImageEditorProvide = ({ children }) => {
   const [settings, setSettings] = useState({
     grayscale: 0,
     brightness: 100,
-    saturation: 0,
+    saturation: 100,
     inversion: 0,
     rotate: 0,
     flipHorizontal: 1,
     flipVertical: 1,
-    exposure: 0,
-    contrast: 0,
   });
   const [crop, setCrop] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [cropRect, setCropRect] = useState({
@@ -41,7 +38,6 @@ const ImageEditorProvide = ({ children }) => {
   const imageRef = useRef(null);
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
-  const oldImageData = useRef(null);
 
   const canvas = canvasRef.current;
   const ctx = ctxRef.current;
@@ -63,6 +59,7 @@ const ImageEditorProvide = ({ children }) => {
   const drawImage = useCallback(
     (x, y, isDragging) => {
       const img = imageRef.current;
+
       const canvasWidth = canvas.width;
       const canvasHeight = canvas.height;
       const imgWidth = img.width;
@@ -87,15 +84,6 @@ const ImageEditorProvide = ({ children }) => {
         newHeight * settings.flipVertical
       );
       setCurrentCoordinates({ x, y, width: newWidth, height: newHeight });
-
-      const imgData = ctx.getImageData(x, y, newWidth, newHeight);
-      oldImageData.current = new ImageData(
-        new Uint8ClampedArray(imgData.data),
-        imgData.width,
-        imgData.height
-      );
-      // if (!oldImageData.current) {
-      // }
     },
     [canvas, ctx, settings]
   );
@@ -144,231 +132,6 @@ const ImageEditorProvide = ({ children }) => {
     [canvas, cropRect, ctx, cropBox]
   );
 
-  const adjustBrightness = () => {
-    if (!oldImageData.current || !currentCoordinates.width) return;
-
-    const imgData = ctx.getImageData(
-      currentCoordinates.x,
-      currentCoordinates.y,
-      currentCoordinates.width,
-      currentCoordinates.height
-    );
-
-    const data = imgData.data;
-    const originalData = oldImageData.current.data;
-
-    const brightness = Number(settings.brightness) - 100;
-
-    for (let i = 0; i < data.length; i += 4) {
-      let r = originalData[i];
-      let g = originalData[i + 1];
-      let b = originalData[i + 2];
-
-      r += Number(brightness);
-      g += Number(brightness);
-      b += Number(brightness);
-
-      r = Math.max(0, Math.min(255, r));
-      g = Math.max(0, Math.min(255, g));
-      b = Math.max(0, Math.min(255, b));
-
-      // Update the pixel values
-      data[i] = r;
-      data[i + 1] = g;
-      data[i + 2] = b;
-    }
-
-    ctx.clearRect(
-      currentCoordinates.x,
-      currentCoordinates.y,
-      canvas.width,
-      canvas.height
-    );
-
-    ctx.putImageData(imgData, currentCoordinates.x, currentCoordinates.y);
-    const dataUrl = canvas.toDataURL();
-    const img = document.createElement("img");
-    img.src = dataUrl;
-    setImage(dataUrl);
-    imageRef.current = img;
-  };
-
-  // const adjustGrayscale = () => {
-  //   if (Number(settings.grayscale) < 1) return;
-
-  //   const imageData = new ImageData(
-  //     oldImageData.current.width,
-  //     oldImageData.current.height
-  //   );
-  //   imageData.data.set(oldImageData.current.data);
-  //   const data = imageData.data;
-
-  //   const gs = Number(settings.grayscale) / 100;
-
-  //   for (let i = 0; i < data.length; i += 4) {
-  //     const grayscale = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11;
-
-  //     const adjustedGrayscale = grayscale * gs;
-
-  //     data[i] = adjustedGrayscale;
-  //     data[i + 1] = adjustedGrayscale;
-  //     data[i + 1] = adjustedGrayscale;
-  //   }
-
-  //   ctx.clearRect(
-  //     currentCoordinates.x,
-  //     currentCoordinates.y,
-  //     canvas.width,
-  //     canvas.height
-  //   );
-  //   ctx.putImageData(imageData, currentCoordinates.x, currentCoordinates.y);
-  //   const dataUrl = canvas.toDataURL();
-  //   const img = document.createElement("img");
-  //   img.src = dataUrl;
-  //   setImage(dataUrl);
-  //   imageRef.current = img;
-  // };
-
-  const adjustSaturation = () => {
-    if (Number(settings.saturation) < 1) return;
-
-    const imageData = oldImageData.current;
-    const data = imageData.data;
-
-    const saturation = Number(settings.saturation) / 100;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-
-      const grayscale = (r + g + b) / 3;
-
-      data[i] = (r - grayscale) * saturation + grayscale;
-      data[i + 1] = (g - grayscale) * saturation + grayscale;
-      data[i + 2] = (b - grayscale) * saturation + grayscale;
-    }
-
-    ctx.clearRect(
-      currentCoordinates.x,
-      currentCoordinates.y,
-      canvas.width,
-      canvas.height
-    );
-    ctx.putImageData(imageData, currentCoordinates.x, currentCoordinates.y);
-    const dataUrl = canvas.toDataURL();
-    const img = document.createElement("img");
-    img.src = dataUrl;
-    setImage(dataUrl);
-    imageRef.current = img;
-  };
-
-  // const adjustInversion = () => {
-  //   if (Number(settings.inversion) < 0 || currentCoordinates.width == null)
-  //     return;
-
-  //   const imgData = ctx.getImageData(
-  //     currentCoordinates.x,
-  //     currentCoordinates.y,
-  //     currentCoordinates.width,
-  //     currentCoordinates.height
-  //   );
-
-  //   const data = imgData.data;
-  //   const originalData = oldImageData.current;
-
-  //   const inversion = Number(settings.inversion) / 100;
-
-  //   for (let i = 0; i < data.length; i += 4) {
-  //     // Calculate the inverted color value for each channel
-  //     data[i] = originalData.data[i] * inversion + data[i] * (1 - inversion);
-  //     data[i + 1] =
-  //       originalData.data[i + 1] * inversion + data[i + 1] * (1 - inversion);
-  //     data[i + 2] =
-  //       originalData.data[i + 2] * inversion + data[i + 2] * (1 - inversion);
-  //   }
-
-  //   ctx.clearRect(
-  //     currentCoordinates.x,
-  //     currentCoordinates.y,
-  //     canvas.width,
-  //     canvas.height
-  //   );
-  //   ctx.putImageData(imgData, currentCoordinates.x, currentCoordinates.y);
-  //   const dataUrl = canvas.toDataURL();
-  //   const img = document.createElement("img");
-  //   img.src = dataUrl;
-  //   setImage(dataUrl);
-  //   imageRef.current = img;
-  // };
-
-  const adjustExposure = () => {
-    if (currentCoordinates.width == null) return;
-    const imgData = ctx.getImageData(
-      currentCoordinates.x,
-      currentCoordinates.y,
-      currentCoordinates.width,
-      currentCoordinates.height
-    );
-
-    const data = imgData.data;
-    const factor = Math.pow(2, Number(settings.exposure) / 100);
-
-    for (let i = 0; i < data.length; i += 4) {
-      // Adjust each channel individually
-      data[i] = Math.min(255, data[i] * factor); // Red channel
-      data[i + 1] = Math.min(255, data[i + 1] * factor); // Green channel
-      data[i + 2] = Math.min(255, data[i + 2] * factor); // Blue channel
-    }
-
-    ctx.clearRect(
-      currentCoordinates.x,
-      currentCoordinates.y,
-      canvas.width,
-      canvas.height
-    );
-    ctx.putImageData(imgData, currentCoordinates.x, currentCoordinates.y);
-    const dataUrl = canvas.toDataURL();
-    const img = document.createElement("img");
-    img.src = dataUrl;
-    setImage(dataUrl);
-    imageRef.current = img;
-  };
-
-  const adjustContrast = () => {
-    if (Number(settings.contrast) < 1 || currentCoordinates.width == null)
-      return;
-
-    const imgData = ctx.getImageData(
-      currentCoordinates.x,
-      currentCoordinates.y,
-      currentCoordinates.width,
-      currentCoordinates.height
-    );
-
-    const data = imgData.data;
-    const contrast = (Number(settings.contrast) + 255) / 255;
-
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = Math.round((data[i] - 128) * contrast + 128); // Red channel
-      data[i + 1] = Math.round((data[i + 1] - 128) * contrast + 128); // Green channel
-      data[i + 2] = Math.round((data[i + 2] - 128) * contrast + 128); // Blue channel
-    }
-
-    ctx.clearRect(
-      currentCoordinates.x,
-      currentCoordinates.y,
-      canvas.width,
-      canvas.height
-    );
-    ctx.putImageData(imgData, currentCoordinates.x, currentCoordinates.y);
-    const dataUrl = canvas.toDataURL();
-    const img = document.createElement("img");
-    img.src = dataUrl;
-    setImage(dataUrl);
-    imageRef.current = img;
-  };
-
   const applySettings = useCallback(
     (drawRect = false, e, isImageDragging = false) => {
       if (canvas && ctx) {
@@ -376,12 +139,12 @@ const ImageEditorProvide = ({ children }) => {
         ctx.save();
         ctx.scale(settings.flipHorizontal, settings.flipVertical);
         // ctx.rotate((settings.rotate * Math.PI) / 180);
-        ctx.filter = `invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
+        ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
         const x = e ? e.pageX - canvas.offsetLeft : currentCoordinates.x;
         const y = e ? e.pageY - canvas.offsetTop : currentCoordinates.y;
         drawImage(x, y, isImageDragging);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        // ctx.filter = "none";
+        ctx.filter = "none";
 
         ctx.canvas.style.boxShadow = "rgba(0, 0, 0, 0.15) 0px 2px 8px";
         ctx.canvas.style.backgroundColor = "white";
@@ -609,13 +372,11 @@ const ImageEditorProvide = ({ children }) => {
       setSettings({
         grayscale: 0,
         brightness: 100,
-        saturation: 0,
+        saturation: 100,
         inversion: 0,
         rotate: 0,
         flipHorizontal: 1,
         flipVertical: 1,
-        exposure: 0,
-        contrast: 0,
       });
     }
   };
@@ -669,22 +430,6 @@ const ImageEditorProvide = ({ children }) => {
     if (canvas) applySettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings, image, cropBox]);
-
-  useEffect(() => {
-    if (timeout) {
-      clearTimeout(timeout);
-      timeout = null;
-    }
-
-    timeout = setTimeout(() => {
-      adjustBrightness();
-      // adjustGrayscale();
-      // adjustInversion();
-      adjustSaturation();
-      adjustExposure();
-      adjustContrast();
-    }, 500);
-  }, [settings]);
 
   useEffect(() => {
     const cropImageBtn = document.getElementById("crop-box-btn");
