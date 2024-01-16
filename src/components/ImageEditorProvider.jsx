@@ -614,6 +614,8 @@ const ImageEditorProvide = ({ children }) => {
         rotate: 0,
         flipHorizontal: 1,
         flipVertical: 1,
+        exposure: 0,
+        contrast: 0,
       });
     }
   };
