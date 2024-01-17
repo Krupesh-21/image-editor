@@ -4,20 +4,20 @@ import useAddCanvasListner from "./useAddCanvasListner";
 
 export const ImageEditorContext = createContext(null);
 
-let animationId = null;
-
 const ImageEditorProvide = ({ children }) => {
   const [image, setImage] = useState(null);
   const [oldImage, setOldImage] = useState(null);
   const [imageName, setImageName] = useState("");
   const [settings, setSettings] = useState({
     grayscale: 0,
-    brightness: 100,
-    saturation: 100,
+    brightness: 0,
+    saturation: 0,
     inversion: 0,
     rotate: 0,
     flipHorizontal: 1,
     flipVertical: 1,
+    exposure: 0,
+    contrast: 0,
   });
   const [crop, setCrop] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [cropRect, setCropRect] = useState({
@@ -56,51 +56,98 @@ const ImageEditorProvide = ({ children }) => {
     if (dropZone) dropZone.classList.remove("highlight");
   };
 
+  const drawImageOnCanvas = (
+    canvas,
+    ctx,
+    image,
+    toSetCoOrd = false,
+    toGetImageData = false,
+    isToDrawCropBox = false
+  ) => {
+    const imageWidth = image.width;
+    const imageHeight = image.height;
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+
+    const scaleX = canvasWidth / imageWidth;
+    const scaleY = canvasHeight / imageHeight;
+    const scale = Math.min(scaleX, scaleY);
+
+    const x = (canvasWidth - imageWidth * scale) / 2;
+    const y = (canvasHeight - imageHeight * scale) / 2;
+
+    const newWidth = parseInt(imageWidth * scale, 10);
+    const newHeight = parseInt(imageHeight * scale, 10);
+
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.drawImage(image, x, y, newWidth, newHeight);
+
+    if (isToDrawCropBox) {
+      const { startX, startY, croppedWidth, croppedHeight } =
+        cropDimension.current;
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(startX, startY, croppedWidth, croppedHeight);
+    }
+
+    ctx.restore();
+
+    if (toSetCoOrd) {
+      setCurrentCoordinates({
+        x,
+        y,
+        width: newWidth,
+        height: newHeight,
+      });
+    }
+
+    if (toGetImageData) {
+      return ctx.getImageData(x, y, newWidth, newHeight);
+    }
+  };
+
+  const getOldImageData = useCallback(() => {
+    const newCanvas = document.createElement("canvas");
+    const newCtx = newCanvas.getContext("2d");
+
+    newCtx.canvas.width = canvas.width;
+    newCtx.canvas.height = canvas.height;
+
+    return drawImageOnCanvas(newCanvas, newCtx, imageRef.current, false, true);
+  }, [canvas]);
+
   const drawImage = useCallback(
-    (x, y, isDragging) => {
-      const img = imageRef.current;
+    (src, isToDrawCropBox) => {
+      const image = new Image();
+      image.onload = () => {
+        drawImageOnCanvas(canvas, ctx, image, true, false, isToDrawCropBox);
+      };
 
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const imgWidth = img.width;
-      const imgHeight = img.height;
-
-      const scaleFactor = Math.min(
-        canvasWidth / imgWidth,
-        canvasHeight / imgHeight
-      );
-
-      const newWidth = imgWidth * scaleFactor;
-      const newHeight = imgHeight * scaleFactor;
-
-      x = isDragging ? x - newWidth / 2 : (canvasWidth - newWidth) / 2;
-      y = isDragging ? y - newHeight / 2 : (canvasHeight - newHeight) / 2;
-
-      ctx.drawImage(
-        img,
-        x * settings.flipHorizontal,
-        y * settings.flipVertical,
-        newWidth * settings.flipHorizontal,
-        newHeight * settings.flipVertical
-      );
-      setCurrentCoordinates({ x, y, width: newWidth, height: newHeight });
+      image.src = src;
     },
-    [canvas, ctx, settings]
+    [canvas, ctx]
   );
 
   const drawCropBox = useCallback(
     (e) => {
-      const width = e
+      let width = e
         ? e.pageX - canvas.offsetLeft - (cropRect?.startX || 0)
         : 150;
-      const height = e
+      let height = e
         ? e.pageY - canvas.offsetTop - (cropRect?.startY || 0)
         : 150;
 
+      width = width / zoomScale;
+      height = height / zoomScale;
+
       const { startX, startY } = cropDimension.current;
 
-      const x = e ? startX : canvas.width / 2 - 150 / 2;
-      const y = e ? startY : canvas.height / 2 - 150 / 2;
+      const x = e ? startX / zoomScale : canvas.width / 2 - 150 / zoomScale / 2;
+      const y = e
+        ? startY / zoomScale
+        : canvas.height / 2 - 150 / zoomScale / 2;
 
       setCropRect((prev) => ({
         ...prev,
@@ -111,54 +158,179 @@ const ImageEditorProvide = ({ children }) => {
         endX: e ? prev.endX : x,
         endY: e ? prev.endY : y,
       }));
-      ctx.strokeStyle = "white";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(startX, startY, width, height);
 
       cropDimension.current = {
         ...cropDimension.current,
-        endX: e ? e.offsetX : x,
-        endY: e ? e.offsetY : y,
+        endX: e ? e.offsetX / zoomScale : x,
+        endY: e ? e.offsetY / zoomScale : y,
         croppedWidth: width,
         croppedHeight: height,
         startX: x,
         startY: y,
       };
 
+      drawImage(oldImage, true);
+
       if (cropBox) {
         setDisabledCropBtn(false);
       }
     },
-    [canvas, cropRect, ctx, cropBox]
+    [canvas, cropRect, cropBox, drawImage, oldImage, zoomScale]
+  );
+
+  const putImageData = useCallback(
+    (imageData) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.putImageData(imageData, currentCoordinates.x, currentCoordinates.y);
+      drawImage(canvas.toDataURL());
+    },
+    [canvas, ctx, currentCoordinates, drawImage]
+  );
+
+  const adjustBrightness = useCallback(
+    (value, imageData) =>
+      new Promise((resolve) => {
+        if (currentCoordinates.width != null) {
+          const data = imageData.data;
+
+          const brightness = Math.round((Number(value) / 100) * 255);
+          for (let i = 0; i < data.length; i += 4) {
+            data[i] = data[i] + brightness;
+            data[i + 1] = data[i + 1] + brightness;
+            data[i + 2] = data[i + 2] + brightness;
+          }
+          // putImageData(imageData);
+        }
+        resolve(imageData);
+      }),
+    [currentCoordinates]
+  );
+
+  const adjustGrayscale = useCallback(
+    (value, imageData) =>
+      new Promise((resolve) => {
+        if (currentCoordinates.width != null) {
+          const data = imageData.data;
+
+          const gs = 1 + Number(value) / 100;
+
+          for (let i = 0; i < data.length; i += 4) {
+            const value =
+              0.21 * data[i] + 0.72 * data[i + 1] + 0.07 * data[i + 2] * gs;
+
+            data[i] = value;
+            data[i + 1] = value;
+            data[i + 1] = value;
+          }
+        }
+
+        resolve(imageData);
+      }),
+    [currentCoordinates]
+  );
+
+  const adjustSaturation = useCallback(
+    (value, imageData) =>
+      new Promise((resolve) => {
+        if (currentCoordinates.width != null) {
+          const data = imageData.data;
+
+          const saturation = -(Number(value) / 100);
+
+          for (let i = 0; i < data.length; i += 4) {
+            const max = Math.max(data[i], data[i + 1], data[i + 2]);
+            data[i] += max !== data[i] ? (max - data[i]) * saturation : 0;
+            data[i + 1] +=
+              max !== data[i + 1] ? (max - data[i + 1]) * saturation : 0;
+            data[i + 2] +=
+              max !== data[i + 2] ? (max - data[i + 2]) * saturation : 0;
+          }
+        }
+
+        resolve(imageData);
+      }),
+    [currentCoordinates]
+  );
+
+  const adjustInversion = useCallback(
+    (value, imageData) =>
+      new Promise((resolve) => {
+        if (currentCoordinates.width != null) {
+          const data = imageData.data;
+
+          const inversion = 1 + Number(value) / 100;
+
+          for (let i = 0; i < data.length; i += 4) {
+            data[i] = 255 - data[i] * inversion;
+            data[i + 1] = 255 - data[i + 1] * inversion;
+            data[i + 2] = 255 - data[i + 2] * inversion;
+          }
+        }
+
+        resolve(imageData);
+      }),
+    [currentCoordinates]
+  );
+
+  const adjustExposure = useCallback(
+    (value, imageData) =>
+      new Promise((resolve) => {
+        if (currentCoordinates.width != null) {
+          const data = imageData.data;
+          const factor = Math.pow(2, Number(value) / 100);
+
+          for (let i = 0; i < data.length; i += 4) {
+            // Adjust each channel individually
+            data[i] = Math.min(255, data[i] * factor); // Red channel
+            data[i + 1] = Math.min(255, data[i + 1] * factor); // Green channel
+            data[i + 2] = Math.min(255, data[i + 2] * factor); // Blue channel
+          }
+        }
+
+        resolve(imageData);
+      }),
+    [currentCoordinates]
+  );
+
+  const adjustContrast = useCallback(
+    (value, imageData) =>
+      new Promise((resolve) => {
+        if (currentCoordinates.width != null) {
+          const data = imageData.data;
+          const contrast = (Number(value) + 255) / 255;
+
+          for (let i = 0; i < data.length; i += 4) {
+            data[i] = Math.round((data[i] - 128) * contrast + 128); // Red channel
+            data[i + 1] = Math.round((data[i + 1] - 128) * contrast + 128); // Green channel
+            data[i + 2] = Math.round((data[i + 2] - 128) * contrast + 128); // Blue channel
+          }
+        }
+
+        resolve(imageData);
+      }),
+    [currentCoordinates]
   );
 
   const applySettings = useCallback(
     (drawRect = false, e, isImageDragging = false) => {
       if (canvas && ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.save();
         ctx.scale(settings.flipHorizontal, settings.flipVertical);
         // ctx.rotate((settings.rotate * Math.PI) / 180);
-        ctx.filter = `brightness(${settings.brightness}%) saturate(${settings.saturation}%) invert(${settings.inversion}%) grayscale(${settings.grayscale}%)`;
         const x = e ? e.pageX - canvas.offsetLeft : currentCoordinates.x;
         const y = e ? e.pageY - canvas.offsetTop : currentCoordinates.y;
-        drawImage(x, y, isImageDragging);
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.filter = "none";
+        drawImage(imageRef.current.src, x, y, isImageDragging);
 
-        ctx.canvas.style.boxShadow = "rgba(0, 0, 0, 0.15) 0px 2px 8px";
-        ctx.canvas.style.backgroundColor = "white";
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
 
         if ((drawRect && typeof drawRect === "boolean") || cropBox)
           drawCropBox(e, x, y, isImageDragging);
-        if (animationId) {
-          cancelAnimationFrame(animationId);
-        }
+        // if (animationId) {
+        //   cancelAnimationFrame(animationId);
+        // }
 
         if (!isDragging && !isImageDragging) {
-          animationId = window.requestAnimationFrame(applySettings);
+          // animationId = window.requestAnimationFrame(applySettings);
         }
-        ctx.restore();
       }
     },
     [
@@ -211,12 +383,12 @@ const ImageEditorProvide = ({ children }) => {
   const mouseMove = useCallback(
     (e) => {
       if (isDragging || isImageDragging) {
-        applySettings(isDragging, e, !isDragging && isImageDragging);
+        drawCropBox(e);
         if (!isDragging && isImageDragging) canvas.style.cursor = "move";
         else canvas.style.cursor = "default";
       }
     },
-    [isDragging, applySettings, isImageDragging, canvas]
+    [isDragging, drawCropBox, isImageDragging, canvas]
   );
 
   const mouseUp = useCallback(() => {
@@ -285,6 +457,9 @@ const ImageEditorProvide = ({ children }) => {
         ctxRef.current = ctx;
         imageRef.current = img;
 
+        ctx.canvas.style.boxShadow = "rgba(0, 0, 0, 0.15) 0px 2px 8px";
+        ctx.canvas.style.backgroundColor = "white";
+
         if (imagePreview) {
           imagePreview.appendChild(canvas);
         }
@@ -311,6 +486,20 @@ const ImageEditorProvide = ({ children }) => {
     setSettings((prev) => ({ ...prev, [name]: value }));
   }, []);
 
+  const applyFilters = async () => {
+    const { brightness, contrast, exposure, saturation, inversion, grayscale } =
+      settings;
+    let imageData = getOldImageData();
+    if (brightness) imageData = await adjustBrightness(brightness, imageData);
+    if (contrast) imageData = await adjustContrast(contrast, imageData);
+    if (exposure) imageData = await adjustExposure(exposure, imageData);
+    if (grayscale) imageData = await adjustGrayscale(grayscale, imageData);
+    if (inversion) imageData = await adjustInversion(inversion, imageData);
+    if (saturation) imageData = await adjustSaturation(saturation, imageData);
+
+    putImageData(imageData);
+  };
+
   const handleCropChange = ({ target: { value, name } }) => {
     setCrop((prev) => ({ ...prev, [name]: value.trim() ? Number(value) : 0 }));
   };
@@ -333,6 +522,8 @@ const ImageEditorProvide = ({ children }) => {
     if (dataUrl !== "data:,") {
       setImage(dataUrl);
       const img = document.createElement("img");
+      img.width = croppedWidth;
+      img.height = croppedHeight;
       img.src = dataUrl;
       imageRef.current = img;
     }
@@ -366,17 +557,18 @@ const ImageEditorProvide = ({ children }) => {
     const img = imageRef.current;
     if (img && oldImage && canvas) {
       setCrop({ x: 0, y: 0, width: 0, height: 0 });
-      img.src = oldImage;
+      imageRef.current.src = oldImage;
       setImage(oldImage);
-      drawImage();
       setSettings({
         grayscale: 0,
-        brightness: 100,
-        saturation: 100,
+        brightness: 0,
+        saturation: 0,
         inversion: 0,
         rotate: 0,
         flipHorizontal: 1,
         flipVertical: 1,
+        exposure: 0,
+        contrast: 0,
       });
     }
   };
@@ -396,30 +588,28 @@ const ImageEditorProvide = ({ children }) => {
       _zoomScale = Math.min(zoomScale * zoom, 30);
 
       if (_zoomScale <= 1) {
-        ctx.resetTransform();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         _zoomScale = 1;
-        setZoomScale(_zoomScale);
-        applySettings();
-        return;
+      } else {
+        const trasnform = ctx.getTransform();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.translate(translateX, translateY);
+        ctx.scale(zoom, zoom);
+        ctx.translate(-translateX, -translateY);
+        ctx.transform(
+          trasnform.a,
+          trasnform.b,
+          trasnform.c,
+          trasnform.d,
+          trasnform.e,
+          trasnform.f
+        );
       }
 
-      const trasnform = ctx.getTransform();
-      ctx.resetTransform();
-      ctx.translate(translateX, translateY);
-      ctx.scale(zoom, zoom);
-      ctx.translate(-translateX, -translateY);
-      ctx.transform(
-        trasnform.a,
-        trasnform.b,
-        trasnform.c,
-        trasnform.d,
-        trasnform.e,
-        trasnform.f
-      );
       setZoomScale(_zoomScale);
-      applySettings();
+      drawImage(image);
     },
-    [applySettings, zoomScale, canvas, ctx]
+    [drawImage, zoomScale, canvas, ctx, image]
   );
 
   const toggleCropBox = useCallback(() => {
@@ -427,9 +617,21 @@ const ImageEditorProvide = ({ children }) => {
   }, []);
 
   useEffect(() => {
+    if (canvas && currentCoordinates.width != null) {
+      applyFilters();
+    }
+  }, [settings]);
+
+  useEffect(() => {
     if (canvas) applySettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings, image, cropBox]);
+  }, [image]);
+
+  useEffect(() => {
+    if (cropBox) {
+      drawCropBox();
+    }
+  }, [cropBox]);
 
   useEffect(() => {
     const cropImageBtn = document.getElementById("crop-box-btn");
