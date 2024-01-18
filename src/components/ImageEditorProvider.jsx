@@ -466,13 +466,27 @@ const ImageEditorProvide = ({ children }) => {
   };
 
   const handleSettings = useCallback(({ target: { value, name } }) => {
-    setSettings((prev) => ({ ...prev, [name]: value }));
+    setSettings((prev) => ({ ...prev, [name]: Number(value) }));
   }, []);
 
   const applyFilters = async () => {
     const { brightness, contrast, exposure, saturation, inversion, grayscale } =
       settings;
-    let imageData = getOldImageData();
+
+    let oldData = getOldImageData();
+    let imageData = ctx.getImageData(
+      currentCoordinates.x,
+      currentCoordinates.y,
+      currentCoordinates.width,
+      currentCoordinates.height
+    );
+
+    for (let i = 0; i < imageData.data.length; i += 4) {
+      imageData.data[i] = oldData.data[i];
+      imageData.data[i + 1] = oldData.data[i + 1];
+      imageData.data[i + 2] = oldData.data[i + 2];
+    }
+
     if (brightness) imageData = await adjustBrightness(brightness, imageData);
     if (contrast) imageData = await adjustContrast(contrast, imageData);
     if (exposure) imageData = await adjustExposure(exposure, imageData);
