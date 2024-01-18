@@ -85,6 +85,19 @@ const ImageEditorProvide = ({ children }) => {
       const newWidth = parseInt(imageWidth * scale, 10);
       const newHeight = parseInt(imageHeight * scale, 10);
 
+      // const imageAspectRatio = imageWidth / imageHeight;
+      // const canvasAspectRatio = canvasWidth / canvasHeight;
+
+      // let newWidth, newHeight;
+
+      // if (imageAspectRatio > canvasAspectRatio) {
+      //   newWidth = canvasWidth;
+      //   newHeight = newWidth / imageAspectRatio;
+      // } else {
+      //   newHeight = canvasHeight;
+      //   newWidth = newHeight * imageAspectRatio;
+      // }
+
       ctx.save();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -172,6 +185,7 @@ const ImageEditorProvide = ({ children }) => {
       };
 
       drawImage(image, true);
+      console.log(image);
 
       if (cropBox) {
         setDisabledCropBtn(false);
@@ -186,14 +200,16 @@ const ImageEditorProvide = ({ children }) => {
       ctx.putImageData(imageData, currentCoordinates.x, currentCoordinates.y);
       const img = document.createElement("img");
       img.src = canvas.toDataURL();
+
+      console.log(currentCoordinates);
       ctx.drawImage(
         img,
         currentCoordinates.x,
-        currentCoordinates,
         currentCoordinates.y,
         currentCoordinates.width,
         currentCoordinates.height
       );
+      setImage(canvas.toDataURL());
     },
     [canvas, ctx, currentCoordinates]
   );
