@@ -109,6 +109,23 @@ const ImageEditorProvide = ({ children }) => {
         ctx.strokeStyle = "white";
         ctx.lineWidth = 2;
         ctx.strokeRect(startX, startY, croppedWidth, croppedHeight);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)"; // Example: semi-transparent black
+
+        // Draw the backdrop rectangle
+        ctx.fillRect(0, 0, startX, canvas.height); // Left side
+        ctx.fillRect(
+          startX + croppedWidth,
+          0,
+          canvas.width - startX - croppedWidth,
+          canvas.height
+        ); // Right side
+        ctx.fillRect(startX, 0, croppedWidth, startY); // Top side
+        ctx.fillRect(
+          startX,
+          startY + croppedHeight,
+          croppedWidth,
+          canvas.height - startY - croppedHeight
+        ); // Bottom side
       }
 
       ctx.restore();
