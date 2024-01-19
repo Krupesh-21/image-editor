@@ -540,7 +540,6 @@ const ImageEditorProvide = ({ children }) => {
       imageData.data[i + 2] = oldData.data[i + 2];
     }
 
-    console.log({ imageData, oldData });
     if (grayscale) imageData = await adjustGrayscale(grayscale, imageData);
     if (brightness) imageData = await adjustBrightness(brightness, imageData);
     if (saturation) imageData = await adjustSaturation(saturation, imageData);
