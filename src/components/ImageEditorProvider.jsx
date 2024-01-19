@@ -89,6 +89,7 @@ const ImageEditorProvide = ({ children }) => {
 
       ctx.save();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingQuality = "high";
 
       ctx.scale(flipRotate.flipHorizontal, flipRotate.flipVertical);
       ctx.drawImage(
@@ -104,7 +105,7 @@ const ImageEditorProvide = ({ children }) => {
         const { startX, startY, croppedWidth, croppedHeight } =
           cropDimension.current;
         ctx.strokeStyle = "white";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1;
         ctx.strokeRect(startX, startY, croppedWidth, croppedHeight);
         ctx.fillStyle = "rgba(0, 0, 0, 0.5)"; // Example: semi-transparent black
 
@@ -286,17 +287,25 @@ const ImageEditorProvide = ({ children }) => {
     (value, imageData) =>
       new Promise((resolve) => {
         if (currentCoordinates.width != null) {
-          const data = imageData.data;
+          const d = imageData.data;
 
-          const saturation = -(Number(value) / 100);
+          value = Number(value) / 100;
 
-          for (let i = 0; i < data.length; i += 4) {
-            const max = Math.max(data[i], data[i + 1], data[i + 2]);
-            data[i] += max !== data[i] ? (max - data[i]) * saturation : 0;
-            data[i + 1] +=
-              max !== data[i + 1] ? (max - data[i + 1]) * saturation : 0;
-            data[i + 2] +=
-              max !== data[i + 2] ? (max - data[i + 2]) * saturation : 0;
+          for (var i = 0; i < d.length; i += 4) {
+            var r = d[i];
+            var g = d[i + 1];
+            var b = d[i + 2];
+            var gray = 0.2989 * r + 0.587 * g + 0.114 * b; //weights from CCIR 601 spec
+            d[i] = -gray * value + d[i] * (1 + value);
+            d[i + 1] = -gray * value + d[i + 1] * (1 + value);
+            d[i + 2] = -gray * value + d[i + 2] * (1 + value);
+            //normalize over- and under-saturated values
+            if (d[i] > 255) d[i] = 255;
+            if (d[i + 1] > 255) d[i] = 255;
+            if (d[i + 2] > 255) d[i] = 255;
+            if (d[i] < 0) d[i] = 0;
+            if (d[i + 1] < 0) d[i] = 0;
+            if (d[i + 2] < 0) d[i] = 0;
           }
         }
 
@@ -418,10 +427,11 @@ const ImageEditorProvide = ({ children }) => {
     if (isDragging && !isImageDragging) {
       setIsDragging(false);
       setDisabledCropBtn(false);
-    } else {
+    } else if (!isDragging && isImageDragging) {
       setIsImageDragging(false);
+      setImage(canvas.toDataURL());
     }
-  }, [isDragging, isImageDragging]);
+  }, [isDragging, isImageDragging, canvas]);
 
   const mouseOver = useCallback(
     (e) => {
@@ -531,12 +541,12 @@ const ImageEditorProvide = ({ children }) => {
       imageData.data[i + 2] = oldData.data[i + 2];
     }
 
-    if (brightness) imageData = await adjustBrightness(brightness, imageData);
-    if (contrast) imageData = await adjustContrast(contrast, imageData);
-    if (exposure) imageData = await adjustExposure(exposure, imageData);
     if (grayscale) imageData = await adjustGrayscale(grayscale, imageData);
-    if (inversion) imageData = await adjustInversion(inversion, imageData);
+    if (brightness) imageData = await adjustBrightness(brightness, imageData);
     if (saturation) imageData = await adjustSaturation(saturation, imageData);
+    if (inversion) imageData = await adjustInversion(inversion, imageData);
+    if (exposure) imageData = await adjustExposure(exposure, imageData);
+    if (contrast) imageData = await adjustContrast(contrast, imageData);
 
     putImageData(imageData);
   };
@@ -558,6 +568,8 @@ const ImageEditorProvide = ({ children }) => {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.putImageData(data, dx, dy);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(zoomScale, zoomScale);
 
     const dataUrl = canvas.toDataURL();
 
@@ -608,6 +620,8 @@ const ImageEditorProvide = ({ children }) => {
       });
       setFlipRotate({ rotate: 0, flipHorizontal: 1, flipVertical: 1 });
       setCurrentCoordinates({ x: 0, y: 0 });
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(1, 1);
       drawImage(oldImage);
     }
   };
