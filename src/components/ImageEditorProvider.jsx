@@ -466,9 +466,11 @@ const ImageEditorProvide = ({ children }) => {
         const canvas = document.createElement("canvas");
         canvas.id = "canvas";
         const ctx = canvas.getContext("2d");
+
         const img = document.createElement("img");
         img.src = e.target.result;
         img.id = "preview-image";
+
         if (previewContainer) previewContainer.style.display = "grid";
 
         const { width, height } = imagePreview.getBoundingClientRect();
@@ -486,6 +488,7 @@ const ImageEditorProvide = ({ children }) => {
         if (imagePreview) {
           imagePreview.appendChild(canvas);
         }
+
         setOldImage(e.target.result);
         setImageName(file.name);
         setImage(e.target.result);
@@ -521,6 +524,7 @@ const ImageEditorProvide = ({ children }) => {
       currentCoordinates.height
     );
 
+    //reset image data as same as old image data then proceed to apply filters
     for (let i = 0; i < imageData.data.length; i += 4) {
       imageData.data[i] = oldData.data[i];
       imageData.data[i + 1] = oldData.data[i + 1];
@@ -556,6 +560,7 @@ const ImageEditorProvide = ({ children }) => {
     ctx.putImageData(data, dx, dy);
 
     const dataUrl = canvas.toDataURL();
+
     setDisabledCropBtn(true);
     setCurrentCoordinates({
       x: sx,
@@ -563,9 +568,11 @@ const ImageEditorProvide = ({ children }) => {
       width: croppedWidth,
       height: croppedHeight,
     });
+
     if (cropBox) {
       toggleCropBox();
     }
+
     if (dataUrl !== "data:,") {
       setImage(dataUrl);
     }
