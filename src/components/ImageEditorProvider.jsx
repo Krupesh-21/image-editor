@@ -403,7 +403,6 @@ const ImageEditorProvide = ({ children }) => {
           endY: cropBox ? 0 : prev.endY,
         }));
       }
-      setCropBox(false);
     },
     [canvas, cropBox, currentCoordinates]
   );
@@ -541,6 +540,7 @@ const ImageEditorProvide = ({ children }) => {
       imageData.data[i + 2] = oldData.data[i + 2];
     }
 
+    console.log({ imageData, oldData });
     if (grayscale) imageData = await adjustGrayscale(grayscale, imageData);
     if (brightness) imageData = await adjustBrightness(brightness, imageData);
     if (saturation) imageData = await adjustSaturation(saturation, imageData);
