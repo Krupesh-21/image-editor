@@ -596,12 +596,10 @@ const ImageEditorProvide = ({ children }) => {
         brightness: 0,
         saturation: 0,
         inversion: 0,
-        rotate: 0,
-        flipHorizontal: 1,
-        flipVertical: 1,
         exposure: 0,
         contrast: 0,
       });
+      setFlipRotate({ rotate: 0, flipHorizontal: 1, flipVertical: 1 });
       setCurrentCoordinates({ x: 0, y: 0 });
       drawImage(oldImage);
     }
