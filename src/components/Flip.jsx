@@ -2,12 +2,12 @@ import { useContext } from "react";
 import { ImageEditorContext } from "./ImageEditorProvider";
 
 const Flip = () => {
-  const { setSettings } = useContext(ImageEditorContext);
+  const { setFlipRotate } = useContext(ImageEditorContext);
   return (
     <div className="flip-container">
       <button
         onClick={() => {
-          setSettings((prev) => ({
+          setFlipRotate((prev) => ({
             ...prev,
             flipHorizontal: prev.flipHorizontal === 1 ? -1 : 1,
           }));
@@ -17,7 +17,7 @@ const Flip = () => {
       </button>
       <button
         onClick={() => {
-          setSettings((prev) => ({
+          setFlipRotate((prev) => ({
             ...prev,
             flipVertical: prev.flipVertical === 1 ? -1 : 1,
           }));
@@ -27,7 +27,7 @@ const Flip = () => {
       </button>
       {/* <button
         onClick={() => {
-          setSettings((prev) => ({
+          setFlipRotate((prev) => ({
             ...prev,
             rotate: prev.rotate - 90,
           }));
@@ -37,7 +37,7 @@ const Flip = () => {
       </button>
       <button
         onClick={() => {
-          setSettings((prev) => ({
+          setFlipRotate((prev) => ({
             ...prev,
             rotate: prev.rotate + 90,
           }));

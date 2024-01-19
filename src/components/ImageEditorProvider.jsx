@@ -13,11 +13,13 @@ const ImageEditorProvide = ({ children }) => {
     brightness: 0,
     saturation: 0,
     inversion: 0,
+    exposure: 0,
+    contrast: 0,
+  });
+  const [flipRotate, setFlipRotate] = useState({
     rotate: 0,
     flipHorizontal: 1,
     flipVertical: 1,
-    exposure: 0,
-    contrast: 0,
   });
   const [crop, setCrop] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [cropRect, setCropRect] = useState({
@@ -85,23 +87,18 @@ const ImageEditorProvide = ({ children }) => {
       const newWidth = parseInt(imageWidth * scale, 10);
       const newHeight = parseInt(imageHeight * scale, 10);
 
-      // const imageAspectRatio = imageWidth / imageHeight;
-      // const canvasAspectRatio = canvasWidth / canvasHeight;
-
-      // let newWidth, newHeight;
-
-      // if (imageAspectRatio > canvasAspectRatio) {
-      //   newWidth = canvasWidth;
-      //   newHeight = newWidth / imageAspectRatio;
-      // } else {
-      //   newHeight = canvasHeight;
-      //   newWidth = newHeight * imageAspectRatio;
-      // }
-
       ctx.save();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      ctx.drawImage(image, x, y, newWidth, newHeight);
+      ctx.scale(flipRotate.flipHorizontal, flipRotate.flipVertical);
+      ctx.drawImage(
+        image,
+        x * flipRotate.flipHorizontal,
+        y * flipRotate.flipVertical,
+        newWidth * flipRotate.flipHorizontal,
+        newHeight * flipRotate.flipVertical
+      );
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
 
       if (isToDrawCropBox) {
         const { startX, startY, croppedWidth, croppedHeight } =
@@ -143,7 +140,7 @@ const ImageEditorProvide = ({ children }) => {
         return ctx.getImageData(x, y, newWidth, newHeight);
       }
     },
-    [isImageDragging]
+    [isImageDragging, flipRotate]
   );
 
   const getOldImageData = useCallback(() => {
@@ -202,7 +199,6 @@ const ImageEditorProvide = ({ children }) => {
       };
 
       drawImage(image, true);
-      console.log(image);
 
       if (cropBox) {
         setDisabledCropBtn(false);
@@ -215,18 +211,30 @@ const ImageEditorProvide = ({ children }) => {
     (imageData) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.putImageData(imageData, currentCoordinates.x, currentCoordinates.y);
+
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = currentCoordinates.width;
+      tempCanvas.height = currentCoordinates.height;
+      const tempCtx = tempCanvas.getContext("2d");
+
       const img = document.createElement("img");
       img.src = canvas.toDataURL();
 
-      console.log(currentCoordinates);
-      ctx.drawImage(
-        img,
-        currentCoordinates.x,
-        currentCoordinates.y,
-        currentCoordinates.width,
-        currentCoordinates.height
-      );
-      setImage(canvas.toDataURL());
+      img.onload = () => {
+        tempCtx.drawImage(
+          img,
+          currentCoordinates.x,
+          currentCoordinates.y,
+          currentCoordinates.width,
+          currentCoordinates.height,
+          0,
+          0,
+          currentCoordinates.width,
+          currentCoordinates.height
+        );
+
+        setImage(tempCanvas.toDataURL());
+      };
     },
     [canvas, ctx, currentCoordinates]
   );
@@ -243,7 +251,6 @@ const ImageEditorProvide = ({ children }) => {
             data[i + 1] = data[i + 1] + brightness;
             data[i + 2] = data[i + 2] + brightness;
           }
-          // putImageData(imageData);
         }
         resolve(imageData);
       }),
@@ -549,14 +556,6 @@ const ImageEditorProvide = ({ children }) => {
     ctx.putImageData(data, dx, dy);
 
     const dataUrl = canvas.toDataURL();
-    if (dataUrl !== "data:,") {
-      setImage(dataUrl);
-      const img = document.createElement("img");
-      img.width = croppedWidth;
-      img.height = croppedHeight;
-      img.src = dataUrl;
-      imageRef.current = img;
-    }
     setDisabledCropBtn(true);
     setCurrentCoordinates({
       x: sx,
@@ -566,6 +565,9 @@ const ImageEditorProvide = ({ children }) => {
     });
     if (cropBox) {
       toggleCropBox();
+    }
+    if (dataUrl !== "data:,") {
+      setImage(dataUrl);
     }
   }
 
@@ -601,6 +603,7 @@ const ImageEditorProvide = ({ children }) => {
         contrast: 0,
       });
       setCurrentCoordinates({ x: 0, y: 0 });
+      drawImage(oldImage);
     }
   };
 
@@ -656,7 +659,7 @@ const ImageEditorProvide = ({ children }) => {
   useEffect(() => {
     if (canvas) drawImage(image);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [image]);
+  }, [image, flipRotate]);
 
   useEffect(() => {
     if (cropBox) {
@@ -735,6 +738,7 @@ const ImageEditorProvide = ({ children }) => {
         disabledCropBtn,
         toggleCropBox,
         cropBox,
+        setFlipRotate,
       }}
     >
       {children}
