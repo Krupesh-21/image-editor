@@ -215,12 +215,13 @@ const ImageEditorProvide = ({ children }) => {
       ctx.save();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingQuality = "high";
+      ctx.scale(flipRotate.flipHorizontal, flipRotate.flipVertical);
       ctx.drawImage(
         img,
-        currentCoordinates.x,
-        currentCoordinates.y,
-        currentCoordinates.width,
-        currentCoordinates.height
+        currentCoordinates.x * flipRotate.flipHorizontal,
+        currentCoordinates.y * flipRotate.flipVertical,
+        currentCoordinates.width * flipRotate.flipHorizontal,
+        currentCoordinates.height * flipRotate.flipVertical
       );
       ctx.setTransform(1, 0, 0, 1, 0, 0);
 
@@ -279,6 +280,7 @@ const ImageEditorProvide = ({ children }) => {
       putImageData,
       image,
       settings,
+      flipRotate,
     ]
   );
 
@@ -713,12 +715,12 @@ const ImageEditorProvide = ({ children }) => {
     if (canvas && currentCoordinates.width != null) {
       applyFilters();
     }
-  }, [settings]);
+  }, [settings, flipRotate]);
 
   useEffect(() => {
     if (canvas) drawImage(image);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [image, flipRotate]);
+  }, [image]);
 
   useEffect(() => {
     if (cropBox) {
